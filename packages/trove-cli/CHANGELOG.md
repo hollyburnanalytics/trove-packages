@@ -1,5 +1,16 @@
 # @ontrove/cli
 
+## 0.3.2
+
+### Patch Changes
+
+- 783c200: Document the working install channels: Homebrew (`brew install
+hollyburnanalytics/tap/trove`), the `curl`/`irm` install scripts, and Bun/npm.
+  The install scripts now verify each download against the release `SHA256SUMS`
+  before extracting (fail-closed on macOS and Windows too).
+  - @ontrove/sdk@0.3.2
+  - @ontrove/mcp@0.3.2
+
 ## 0.3.1
 
 ### Patch Changes

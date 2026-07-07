@@ -49,3 +49,21 @@ jobs:
 
       - name: README examples typecheck against the built API
         run: bun run docs:examples
+
+  # @ontrove/mcp supports `zod: ^3.25.28 || ^4`; the `check` job above exercises
+  # Zod 3. Pin Zod 4 for @ontrove/mcp and run its suite so the dual-version
+  # schema compilation (native `z.toJSONSchema` vs `zod-to-json-schema`) can't
+  # silently regress.
+  mcp-zod4:
+    name: '@ontrove/mcp — Zod 4 compatibility'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
+      - run: bun install --frozen-lockfile
+      - name: Pin Zod 4 for @ontrove/mcp
+        working-directory: packages/trove-mcp
+        run: bun add -d zod@^4
+      - name: Test @ontrove/mcp against Zod 4
+        working-directory: packages/trove-mcp
+        run: bun run test

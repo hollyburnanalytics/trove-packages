@@ -34,6 +34,13 @@ describe('compileInputSchema', () => {
     expect(() => compileInputSchema(z.string())).toThrow(/must be an object/);
   });
 
+  it('closes the root object (additionalProperties: false) for a consistent cross-Zod contract', () => {
+    // Zod 3 emits this; Zod 4's native converter does not — compileInputSchema
+    // normalizes it so tool schemas are identical regardless of the caller's Zod.
+    const schema = compileInputSchema(z.object({ a: z.string() }));
+    expect(schema.additionalProperties).toBe(false);
+  });
+
   it('handles an empty object schema', () => {
     const schema = compileInputSchema(z.object({}));
     expect(schema.type).toBe('object');

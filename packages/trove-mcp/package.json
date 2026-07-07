@@ -57,7 +57,7 @@
     "zod-to-json-schema": "^3.24.5"
   },
   "peerDependencies": {
-    "zod": "^3.25.28"
+    "zod": "^3.25.28 || ^4"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.8",

@@ -1,9 +1,9 @@
 # `@ontrove/cli` — the Trove command-line tool
 
 `trove` is a single, scriptable command-line tool for all of Trove: querying your
-knowledge base, capturing documents, authoring sources, and building and
-deploying your own toolkits (every toolkit runs as a full MCP server on Trove's
-cloud) — all over the one GraphQL API at `api.ontrove.sh/graphql`.
+knowledge base, capturing documents, authoring sources, and building your own
+toolkits as MCP servers (hosted deployment on Trove's cloud is in preview) — all
+over the one GraphQL API at `api.ontrove.sh/graphql`.
 
 > **GraphQL is the API. The CLI is a convenience layer.** Every `trove` command is
 > a thin wrapper over a documented GraphQL operation. The CLI has no privileged

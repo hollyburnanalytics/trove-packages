@@ -5,8 +5,8 @@
 
 The developer toolchain for [Trove](https://ontrove.sh) — a personal knowledge
 base for AI. This monorepo holds the three published `@ontrove/*` packages used
-to author sources, build your own toolkits (every toolkit runs as a full MCP
-server on Trove's cloud), and talk to your knowledge base.
+to author sources, build your own toolkits as MCP servers, and talk to your
+knowledge base.
 
 | Package | What it's for | Install |
 |---------|---------------|-----|

@@ -11,9 +11,12 @@ permissions:
   pull-requests: write
   # Needed to dispatch the Binaries workflow after a publish (gh workflow run).
   actions: write
-  # No `id-token`/npm provenance: provenance requires a public source repo with a
-  # `repository` field, and this repo is private (npm-only). Re-add both — plus the
-  # `repository` field and `NPM_CONFIG_PROVENANCE: "true"` below — if it ever goes public.
+  # Mint an OIDC token so npm attaches a provenance attestation to each publish.
+  # (The repo is public and every package declares `repository`, which provenance
+  # requires.) Publishing still authenticates with the automation NPM_TOKEN below;
+  # migrating to full OIDC trusted publishing — which would retire the token — is
+  # tracked separately (blocked on a scoped-package + changesets/action bug).
+  id-token: write
 
 jobs:
   release:
@@ -45,6 +48,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # Publish with a provenance attestation (needs the id-token permission
+          # above). npm records the source repo, commit, and workflow that built
+          # the tarball, so consumers can verify it came from this repo.
+          NPM_CONFIG_PROVENANCE: "true"
 
       # When the CLI was just published, kick off the standalone-binary build for
       # its release tag. This must be a `workflow_dispatch` (not a tag-`push`

@@ -37,8 +37,8 @@
     "bun": ">=1.2.0"
   },
   "scripts": {
-    "prepack": "tsc -p tsconfig.build.json",
-    "build": "tsc -p tsconfig.build.json",
+    "prepack": "tsc -p tsconfig.build.json && node ../../scripts/build-mcp-worker-runtime.mjs",
+    "build": "tsc -p tsconfig.build.json && node ../../scripts/build-mcp-worker-runtime.mjs",
     "build:vendor": "node ../../scripts/build-mcp-worker-runtime.mjs",
     "build:bin": "bun run build:vendor && bun ../../scripts/build-binaries.mjs",
     "typecheck": "tsc --noEmit",

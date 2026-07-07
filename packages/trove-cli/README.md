@@ -25,13 +25,13 @@ brew install hollyburnanalytics/tap/trove
 **Shell script** (macOS/Linux):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hollyburnanalytics/trove-packages/main/packaging/install.sh | sh
+curl -fsSL https://ontrove.sh/install.sh | sh
 ```
 
 Windows (x64):
 
 ```powershell
-irm https://raw.githubusercontent.com/hollyburnanalytics/trove-packages/main/packaging/install.ps1 | iex
+irm https://ontrove.sh/install.ps1 | iex
 ```
 
 **Bun / npm** — if you already have Bun, skip the binary and run the package

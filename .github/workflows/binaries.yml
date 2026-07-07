@@ -50,6 +50,10 @@ jobs:
           bun run build
           bun run --filter './packages/trove-cli' build:vendor
           bun scripts/build-binaries.mjs --all
+          # Attribution for the third-party deps statically embedded in the binary,
+          # plus our own MIT LICENSE — bundled into every release archive below.
+          node scripts/gen-third-party-licenses.mjs dist/bin/THIRD-PARTY-LICENSES.txt
+          cp LICENSE dist/bin/LICENSE
 
       - name: Upload raw binaries
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -131,10 +135,12 @@ jobs:
         working-directory: dist/bin
         run: |
           set -euo pipefail
+          # Each archive carries the binary plus the MIT LICENSE and the embedded
+          # third-party attribution, so the license terms travel with every copy.
           for f in trove-darwin-arm64 trove-darwin-x64 trove-linux-x64 trove-linux-arm64; do
-            tar -czf "$f.tar.gz" "$f"
+            tar -czf "$f.tar.gz" "$f" LICENSE THIRD-PARTY-LICENSES.txt
           done
-          zip -q trove-windows-x64.zip trove-windows-x64.exe
+          zip -q trove-windows-x64.zip trove-windows-x64.exe LICENSE THIRD-PARTY-LICENSES.txt
           sha256sum ./*.tar.gz ./*.zip > SHA256SUMS
 
       - name: Attach binaries to the release

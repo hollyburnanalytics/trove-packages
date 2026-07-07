@@ -81,6 +81,7 @@ class Trove < Formula
 
   def install
     bin.install Dir["trove-*"].first => "trove"
+    prefix.install Dir["LICENSE", "THIRD-PARTY-LICENSES.txt"]
   end
 
   test do

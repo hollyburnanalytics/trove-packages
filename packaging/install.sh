@@ -48,14 +48,23 @@ trap 'rm -rf "$tmp"' EXIT
 say "Downloading trove ($target, $VERSION)…"
 dl "$base/$asset" "$tmp/$asset" || err "download failed: $base/$asset"
 
-# Verify checksum when SHA256SUMS is available (best-effort; skipped if absent).
-if dl "$base/SHA256SUMS" "$tmp/SHA256SUMS" 2>/dev/null; then
-  if command -v sha256sum >/dev/null 2>&1; then
-    ( cd "$tmp" && grep " $asset\$" SHA256SUMS | sha256sum -c - >/dev/null 2>&1 ) \
-      || err "checksum verification failed"
-    say "Checksum OK."
-  fi
+# Verify the checksum (fail closed). Requires SHA256SUMS on the release and a
+# sha256 tool — sha256sum on Linux, shasum on macOS.
+dl "$base/SHA256SUMS" "$tmp/SHA256SUMS" || err "could not download SHA256SUMS to verify the download"
+if command -v sha256sum >/dev/null 2>&1; then
+  sha256() { sha256sum "$1" | awk '{print $1}'; }
+elif command -v shasum >/dev/null 2>&1; then
+  sha256() { shasum -a 256 "$1" | awk '{print $1}'; }
+else
+  err "no sha256 tool found (need 'sha256sum' or 'shasum') — cannot verify the download"
 fi
+# SHA256SUMS lines look like '<hash>  ./<asset>' or '<hash>  <asset>'; match the
+# basename either way.
+expected="$(grep -E "[ /]${asset}\$" "$tmp/SHA256SUMS" | awk '{print $1}' | head -n1)"
+[ -n "$expected" ] || err "no checksum listed for $asset in SHA256SUMS"
+actual="$(sha256 "$tmp/$asset")"
+[ "$expected" = "$actual" ] || err "checksum verification failed for $asset (expected $expected, got $actual)"
+say "Checksum OK."
 
 tar -xzf "$tmp/$asset" -C "$tmp"
 mkdir -p "$INSTALL_DIR"

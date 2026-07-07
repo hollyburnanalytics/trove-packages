@@ -9,6 +9,8 @@ concurrency: release-${{ github.ref }}
 permissions:
   contents: write
   pull-requests: write
+  # Needed to dispatch the Binaries workflow after a publish (gh workflow run).
+  actions: write
   # No `id-token`/npm provenance: provenance requires a public source repo with a
   # `repository` field, and this repo is private (npm-only). Re-add both — plus the
   # `repository` field and `NPM_CONFIG_PROVENANCE: "true"` below — if it ever goes public.

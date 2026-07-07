@@ -27,6 +27,18 @@ $tmp = New-TemporaryFile
 Write-Host "Downloading trove (windows-x64, $Version)…"
 Invoke-WebRequest -Uri "$base/$asset" -OutFile $tmp
 
+# Verify the checksum before extracting (fail closed).
+$sumsFile = New-TemporaryFile
+Invoke-WebRequest -Uri "$base/SHA256SUMS" -OutFile $sumsFile
+$sums = Get-Content $sumsFile
+$expectedLine = $sums | Where-Object { $_ -match "[ /]$([regex]::Escape($asset))$" } | Select-Object -First 1
+if (-not $expectedLine) { Write-Error "No checksum listed for $asset in SHA256SUMS" }
+$expected = ($expectedLine -split '\s+')[0].ToLower()
+$actual = (Get-FileHash -Path $tmp -Algorithm SHA256).Hash.ToLower()
+if ($expected -ne $actual) { Write-Error "Checksum verification failed for $asset (expected $expected, got $actual)" }
+Remove-Item $sumsFile
+Write-Host "Checksum OK."
+
 Expand-Archive -Path $tmp -DestinationPath $InstallDir -Force
 Remove-Item $tmp
 Write-Host "Installed trove to $InstallDir\trove-windows-x64.exe"

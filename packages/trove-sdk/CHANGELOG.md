@@ -1,5 +1,13 @@
 # @ontrove/sdk
 
+## 0.3.3
+
+### Patch Changes
+
+- 2a3e59b: Publishes now include a signed npm provenance attestation, so consumers can
+  cryptographically verify each tarball was built and published from this repo's
+  release workflow at a specific commit.
+
 ## 0.3.2
 
 ## 0.3.1

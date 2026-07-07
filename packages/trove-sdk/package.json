@@ -1,0 +1,65 @@
+{
+  "name": "@ontrove/sdk",
+  "version": "0.3.0",
+  "description": "Thin standard library for authoring Trove sources — defineSource, the sync(ctx) capability object, the document shape, the local-run harness, and manifest validation.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Hollyburn Analytics Inc. <matt@hollyburnanalytics.com>",
+  "homepage": "https://ontrove.sh",
+  "bugs": {
+    "email": "matt@hollyburnanalytics.com",
+    "url": "https://github.com/hollyburnanalytics/trove-packages/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "trove",
+    "source",
+    "sync",
+    "sdk",
+    "knowledge-base",
+    "ingestion",
+    "etl"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "prepack": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "test": "vitest run",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.8",
+    "@vitest/coverage-v8": "^4.1.1",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hollyburnanalytics/trove-packages.git",
+    "directory": "packages/trove-sdk"
+  }
+}

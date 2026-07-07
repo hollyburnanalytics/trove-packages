@@ -1,0 +1,14 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPointStrategy": "packages",
+  "entryPoints": ["packages/trove-sdk", "packages/trove-mcp"],
+  "plugin": ["typedoc-plugin-markdown"],
+  "out": "api-reference",
+  "readme": "none",
+  "githubPages": false,
+  "hideGenerator": true,
+  "excludeExternals": true,
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "disableSources": true
+}

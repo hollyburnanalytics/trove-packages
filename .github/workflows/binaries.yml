@@ -1,0 +1,163 @@
+name: Binaries
+
+# Build, sign, and publish the standalone `trove` single-binaries for a release.
+# Bun cross-compiles every target from Linux, so the build is one job; the macOS
+# binaries are then signed + notarized on a macOS runner (gated on Apple
+# secrets), and everything is attached to the GitHub Release with checksums.
+#
+# How it's triggered: the Release workflow dispatches this one (with the CLI tag)
+# right after it publishes the CLI to npm — a tag `push` alone can't be used,
+# because the release tag is created with the automatic GITHUB_TOKEN and GitHub
+# does not start `push`-triggered workflows for such tags. `workflow_dispatch`
+# (and a manual `vX.Y.Z` / `@ontrove/cli@x.y.z` tag push by a human) both work.
+#
+# Windows signing is intentionally not wired yet (no Azure Trusted Signing
+# account); the Windows binary ships unsigned until that exists.
+
+on:
+  push:
+    tags:
+      - '@ontrove/cli@*'
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to build binaries for (e.g. @ontrove/cli@0.3.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency: binaries-${{ github.event.inputs.tag || github.ref }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # Build the exact tagged release: on a tag push `github.ref` is the tag; on
+      # a dispatch it's the default branch, so check out the requested tag instead.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
+      - run: bun install --frozen-lockfile
+
+      # dist of sdk+mcp is needed so build:vendor can pre-bundle @ontrove/mcp for
+      # the embedded worker runtime; then cross-compile every shipping target.
+      - name: Build packages + all binaries
+        run: |
+          bun run build
+          bun run --filter './packages/trove-cli' build:vendor
+          bun scripts/build-binaries.mjs --all
+
+      - name: Upload raw binaries
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: binaries-raw
+          path: dist/bin/*
+          if-no-files-found: error
+
+  sign-macos:
+    needs: build
+    runs-on: macos-14
+    steps:
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
+        with:
+          name: binaries-raw
+          path: dist/bin
+      - name: Sign + notarize (skipped when Apple secrets are absent)
+        env:
+          # Configure these in repo settings → Secrets. Until then this step is a
+          # no-op and the macOS binaries ship unsigned.
+          APPLE_CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          APPLE_SIGN_IDENTITY: ${{ secrets.APPLE_SIGN_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APPLE_CERT_P12}" ]; then
+            echo "::warning::Apple signing secrets absent — shipping macOS binaries UNSIGNED."
+            exit 0
+          fi
+          # Import the Developer ID cert into a temporary keychain.
+          KEYCHAIN="$RUNNER_TEMP/build.keychain"
+          security create-keychain -p pw "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p pw "$KEYCHAIN"
+          echo "$APPLE_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$APPLE_CERT_PASSWORD" \
+            -T /usr/bin/codesign
+          security list-keychains -d user -s "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -s -k pw "$KEYCHAIN" >/dev/null
+          for bin in dist/bin/trove-darwin-arm64 dist/bin/trove-darwin-x64; do
+            codesign --force --options runtime --timestamp \
+              --sign "$APPLE_SIGN_IDENTITY" "$bin"
+            # Notarize (zip → submit → the binary is stapled implicitly via Gatekeeper
+            # ticket lookup; standalone binaries can't be stapled, so notarization
+            # alone is what clears Gatekeeper on first run).
+            ditto -c -k "$bin" "$RUNNER_TEMP/$(basename "$bin").zip"
+            xcrun notarytool submit "$RUNNER_TEMP/$(basename "$bin").zip" \
+              --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
+              --password "$APPLE_APP_PASSWORD" --wait
+          done
+      - name: Re-upload signed macOS binaries
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: binaries-signed-macos
+          path: dist/bin/trove-darwin-*
+          if-no-files-found: error
+
+  release:
+    needs: [build, sign-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
+        with:
+          name: binaries-raw
+          path: dist/bin
+      # Signed macOS binaries overwrite the raw ones.
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
+        with:
+          name: binaries-signed-macos
+          path: dist/bin
+
+      - name: Package archives + checksums
+        working-directory: dist/bin
+        run: |
+          set -euo pipefail
+          for f in trove-darwin-arm64 trove-darwin-x64 trove-linux-x64 trove-linux-arm64; do
+            tar -czf "$f.tar.gz" "$f"
+          done
+          zip -q trove-windows-x64.zip trove-windows-x64.exe
+          sha256sum ./*.tar.gz ./*.zip > SHA256SUMS
+
+      - name: Attach binaries to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # On a dispatch, `github.ref_name` is the branch, so take the tag input.
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          # Changesets already created this release when it published the CLI, so
+          # attach to it. Create it only if it is somehow absent (e.g. a manual
+          # `vX.Y.Z` tag with no prior release).
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "$TAG" --generate-notes
+          fi
+          gh release upload "$TAG" \
+            dist/bin/*.tar.gz dist/bin/*.zip dist/bin/SHA256SUMS --clobber
+
+      # To auto-update the Homebrew tap, generate the formula from the checksums
+      # and push it to the tap repo. Enable once the tap exists (see
+      # packaging/homebrew/trove.rb and scripts/gen-homebrew-formula.mjs).
+      #
+      # - name: Update Homebrew tap
+      #   env:
+      #     TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+      #   run: bun scripts/gen-homebrew-formula.mjs "${GITHUB_REF_NAME}" && ./scripts/push-tap.sh

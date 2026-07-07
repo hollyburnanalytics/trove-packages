@@ -1,0 +1,71 @@
+{
+  "name": "@ontrove/cli",
+  "version": "0.3.0",
+  "description": "The Trove command-line tool — a scriptable GraphQL client for your personal knowledge base, and the toolchain for authoring sources and building & deploying toolkits.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Hollyburn Analytics Inc. <matt@hollyburnanalytics.com>",
+  "homepage": "https://ontrove.sh",
+  "bugs": {
+    "email": "matt@hollyburnanalytics.com",
+    "url": "https://github.com/hollyburnanalytics/trove-packages/issues"
+  },
+  "keywords": [
+    "trove",
+    "cli",
+    "mcp",
+    "model-context-protocol",
+    "knowledge-base",
+    "graphql"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "bin": {
+    "trove": "./dist/index.js"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "bun": ">=1.2.0"
+  },
+  "scripts": {
+    "prepack": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json",
+    "build:vendor": "node ../../scripts/build-mcp-worker-runtime.mjs",
+    "build:bin": "bun run build:vendor && bun ../../scripts/build-binaries.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "test": "vitest run",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest run --coverage",
+    "test:smoke": "bun run build:vendor && bun test test/toolchain.smoke.test.ts"
+  },
+  "dependencies": {
+    "@ontrove/mcp": "^0.3.0",
+    "@ontrove/sdk": "^0.3.0",
+    "open": "^10.1.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.8",
+    "@types/node": "^25.5.0",
+    "@vitest/coverage-v8": "^4.1.1",
+    "esbuild": "^0.25.0",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hollyburnanalytics/trove-packages.git",
+    "directory": "packages/trove-cli"
+  }
+}

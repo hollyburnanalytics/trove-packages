@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+concurrency: release-${{ github.ref }}
+
+permissions:
+  contents: write
+  pull-requests: write
+  # No `id-token`/npm provenance: provenance requires a public source repo with a
+  # `repository` field, and this repo is private (npm-only). Re-add both — plus the
+  # `repository` field and `NPM_CONFIG_PROVENANCE: "true"` below — if it ever goes public.
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    # Gate access to NPM_TOKEN behind a protected Environment (configure required
+    # reviewers + restrict to `main` in repo settings → Environments → npm-publish).
+    environment: npm-publish
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
+      - run: bun install --frozen-lockfile
+
+      # Do not publish a build that fails the full gate (lint + typecheck + test + build).
+      - name: Verify
+        run: bun run check
+
+      # Explicit npm auth so `changeset publish` is authenticated regardless of the
+      # toolchain (we use mise, not setup-node's registry-url). The token is read
+      # from the environment at publish time; nothing secret is written to the repo.
+      - name: Configure npm auth
+        run: echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" > "$HOME/.npmrc"
+
+      - name: Create release PR or publish to npm
+        id: changesets
+        uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1
+        with:
+          publish: bun run release
+          version: bun run version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # When the CLI was just published, kick off the standalone-binary build for
+      # its release tag. This must be a `workflow_dispatch` (not a tag-`push`
+      # trigger on the Binaries workflow): the tag Changesets pushes is created
+      # with GITHUB_TOKEN, and GitHub does not start `push`-triggered runs for
+      # tags created by GITHUB_TOKEN — but it *does* honour workflow_dispatch.
+      - name: Build binaries for the published CLI release
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISHED: ${{ steps.changesets.outputs.publishedPackages }}
+        run: |
+          set -euo pipefail
+          tag=$(printf '%s' "$PUBLISHED" \
+            | jq -r '.[] | select(.name == "@ontrove/cli") | "@ontrove/cli@" + .version')
+          if [ -n "$tag" ]; then
+            echo "Dispatching binaries build for $tag"
+            gh workflow run binaries.yml -f tag="$tag"
+          else
+            echo "CLI not among the published packages; no binaries to build."
+          fi

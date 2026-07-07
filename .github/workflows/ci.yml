@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
+      - run: bun install --frozen-lockfile
+
+      # Build first: @ontrove/cli typechecks and tests against the built
+      # dist/*.d.ts of @ontrove/sdk and @ontrove/mcp, so they must exist before
+      # typecheck/test run on a clean checkout.
+      - name: Build
+        run: bun run build
+
+      - name: Lint (Biome)
+        run: bun run lint
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test (with coverage thresholds)
+        run: bun run test:coverage
+
+      # The real Bun toolchain (transpile + run user TS, deploy bundling) runs
+      # under Bun's native test runner — the Node/vitest coverage runner can't
+      # exercise the embedded-resolver path. See test/toolchain.smoke.test.ts.
+      - name: Smoke test the real Bun toolchain
+        run: bun run --filter './packages/trove-cli' test:smoke
+
+      # Prove the single binary compiles and runs (host target) on every push.
+      - name: Build + smoke the single binary
+        run: |
+          bun run --filter './packages/trove-cli' build:bin
+          ./dist/bin/trove --version
+
+      - name: No internal references in shipped source
+        run: bun run refs:check
+
+      - name: README examples typecheck against the built API
+        run: bun run docs:examples

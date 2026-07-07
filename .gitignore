@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Scratch dir for the README-examples typecheck gate (`bun run docs:examples`)
+.doc-examples-tmp/
+
+# Test coverage
+coverage/
+
+# Lockfiles other than bun's
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Env / secrets
+.env
+.env.local
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# mise local state
+.mise/
+
+# Claude Code local settings + private local-only AI rules (never commit)
+.claude/settings.local.json
+CLAUDE.local.md
+
+# Generated TypeDoc API reference — a local preview aid (`bun run api:docs`).
+# The public reference is generated into the docs site from the published
+# packages; it is not committed or served from this (private) repo.
+api-reference/
+
+# Maintainer-only refs:check denylist (names hosting internals)
+scripts/internal-denylist.local.mjs

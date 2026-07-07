@@ -1,0 +1,34 @@
+{
+  "name": "trove-packages",
+  "private": true,
+  "type": "module",
+  "description": "Monorepo for the publishable Trove authoring packages: @ontrove/sdk, @ontrove/mcp, and @ontrove/cli.",
+  "license": "MIT",
+  "author": "Hollyburn Analytics Inc.",
+  "homepage": "https://ontrove.sh",
+  "workspaces": ["packages/*"],
+  "packageManager": "bun@1.2.0",
+  "engines": {
+    "bun": ">=1.2.0",
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "bun run --filter './packages/trove-sdk' --filter './packages/trove-mcp' build && bun run --filter './packages/trove-cli' build",
+    "test": "bun run --filter '*' test",
+    "test:coverage": "bun run --filter '*' test:coverage",
+    "lint": "bun run --filter '*' lint",
+    "typecheck": "bun run --filter '*' typecheck",
+    "refs:check": "node scripts/check-no-internal-refs.mjs",
+    "docs:examples": "node scripts/check-doc-examples.mjs",
+    "api:docs": "typedoc",
+    "check": "bun run build && bun run lint && bun run typecheck && bun run test:coverage && bun run refs:check && bun run docs:examples",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "bun run build && changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.9",
+    "typedoc": "^0.28.0",
+    "typedoc-plugin-markdown": "^4.4.0"
+  }
+}

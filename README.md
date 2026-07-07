@@ -12,7 +12,7 @@ server on Trove's cloud), and talk to your knowledge base.
 |---------|---------------|-----|
 | [`@ontrove/sdk`](packages/trove-sdk) | Author **sources** — `defineSource`, the `sync(ctx)` capability object, the document shape, a local-run harness, and manifest validation. | `npm i @ontrove/sdk` |
 | [`@ontrove/mcp`](packages/trove-mcp) | Author **toolkits** — `defineMcpServer`, the `ctx` capability object, Zod schemas, and `ToolError`. | `npm i @ontrove/mcp` |
-| [`@ontrove/cli`](packages/trove-cli) | The `trove` command-line tool — a scriptable GraphQL client for your knowledge base and the toolchain for authoring sources and building & deploying toolkits. | `bunx @ontrove/cli` · [other channels](packages/trove-cli#install) |
+| [`@ontrove/cli`](packages/trove-cli) | The `trove` command-line tool — a scriptable GraphQL client for your knowledge base and the toolchain for authoring sources and building & deploying toolkits. | `brew install hollyburnanalytics/tap/trove` · [other channels](packages/trove-cli#install) |
 
 > Looking for working examples? See **[the examples gallery](https://github.com/hollyburnanalytics/trove-integrations)** —
 > real sources and toolkits built on these packages.

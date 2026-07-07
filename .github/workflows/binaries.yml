@@ -152,12 +152,36 @@ jobs:
           fi
           gh release upload "$TAG" \
             dist/bin/*.tar.gz dist/bin/*.zip dist/bin/SHA256SUMS --clobber
+          # This CLI release carries the binaries, so make it the "latest" release
+          # — that's what the install script's `releases/latest/download` path and
+          # `TROVE_VERSION=latest` resolve to. (Changesets also tags sdk/mcp, which
+          # have no binaries; without this, "latest" could point at one of those.)
+          gh release edit "$TAG" --latest
 
-      # To auto-update the Homebrew tap, generate the formula from the checksums
-      # and push it to the tap repo. Enable once the tap exists (see
-      # packaging/homebrew/trove.rb and scripts/gen-homebrew-formula.mjs).
-      #
-      # - name: Update Homebrew tap
-      #   env:
-      #     TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-      #   run: bun scripts/gen-homebrew-formula.mjs "${GITHUB_REF_NAME}" && ./scripts/push-tap.sh
+      # Auto-update the Homebrew tap: regenerate Formula/trove.rb from the release
+      # and push it to hollyburnanalytics/homebrew-tap. Skipped when the token is
+      # absent (e.g. a fork) so the release still succeeds.
+      - name: Update Homebrew tap
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TAP_TOKEN:-}" ]; then
+            echo "HOMEBREW_TAP_TOKEN not set — skipping tap update."
+            exit 0
+          fi
+          node scripts/gen-homebrew-formula.mjs "$TAG"
+          git clone --depth 1 "https://x-access-token:${TAP_TOKEN}@github.com/hollyburnanalytics/homebrew-tap.git" tap
+          mkdir -p tap/Formula
+          cp packaging/homebrew/trove.rb tap/Formula/trove.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "Formula unchanged; nothing to push."
+          else
+            git add Formula/trove.rb
+            git commit -m "trove ${TAG##*@}"
+            git push
+          fi

@@ -41,3 +41,6 @@ api-reference/
 
 # Maintainer-only refs:check denylist (names hosting internals)
 scripts/internal-denylist.local.mjs
+
+# Generated Homebrew formula (CI regenerates + pushes it to the tap)
+packaging/homebrew/

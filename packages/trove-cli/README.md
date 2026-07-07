@@ -12,26 +12,40 @@ cloud) — all over the one GraphQL API at `api.ontrove.sh/graphql`.
 
 ## Install
 
-**Bun** — the CLI is a Bun program; if you have Bun, run it directly:
+`trove` ships as a self-contained single binary (`bun build --compile`) — the Bun
+runtime and the `@ontrove/*` packages are embedded, so the binary installs need
+**nothing else on your machine**: no Node, no Bun, no toolchain.
+
+**Homebrew** (macOS/Linux):
+
+```bash
+brew install hollyburnanalytics/tap/trove
+```
+
+**Shell script** (macOS/Linux):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hollyburnanalytics/trove-packages/main/packaging/install.sh | sh
+```
+
+Windows (x64):
+
+```powershell
+irm https://raw.githubusercontent.com/hollyburnanalytics/trove-packages/main/packaging/install.ps1 | iex
+```
+
+**Bun / npm** — if you already have Bun, skip the binary and run the package
+directly (npm works too, but the CLI *runs on Bun*, so you need Bun on your PATH):
 
 ```bash
 bunx @ontrove/cli               # run without installing
-bun add --global @ontrove/cli   # or install it globally
+bun add --global @ontrove/cli   # install it globally
+npm i -g @ontrove/cli           # or from npm (requires Bun on PATH)
 ```
 
-**npm** — installs the package from npm. It *runs on Bun*, so you need Bun on your
-PATH:
-
-```bash
-npm i -g @ontrove/cli
-```
-
-> **Standalone binaries coming soon.** `trove` also builds as a self-contained
-> single binary (`bun build --compile`) with the Bun runtime and `@ontrove/*`
-> embedded — no Node, no Bun, no toolchain. A `curl`-install one-liner and a
-> Homebrew formula covering macOS (arm64 + x64), Linux (x64 + arm64), and Windows
-> x64 are on the way; until they land, use Bun or npm above. (Windows on ARM has
-> no native binary — use `bunx @ontrove/cli` there.)
+> The binary channels cover macOS (arm64 + x64), Linux (x64 + arm64), and Windows
+> x64; each download's checksum is verified against the release `SHA256SUMS`.
+> Windows on ARM has no native binary — use `bunx @ontrove/cli` there.
 
 ## Quickstart
 

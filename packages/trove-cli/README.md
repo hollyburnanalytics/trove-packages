@@ -12,45 +12,26 @@ cloud) — all over the one GraphQL API at `api.ontrove.sh/graphql`.
 
 ## Install
 
-`trove` ships as a self-contained binary (`bun build --compile`) — the Bun runtime
-and the `@ontrove/*` packages are embedded, so **the recommended install needs
-nothing else on your machine**: no Node, no Bun, no toolchain.
-
-**Recommended — one line, no prerequisites** (macOS/Linux):
+**Bun** — the CLI is a Bun program; if you have Bun, run it directly:
 
 ```bash
-curl -fsSL https://ontrove.sh/install.sh | sh
-```
-
-Windows (x64):
-
-```powershell
-irm https://ontrove.sh/install.ps1 | iex
-```
-
-**Homebrew** (macOS/Linux):
-
-```bash
-brew install hollyburnanalytics/tap/trove
-```
-
-**Bun** — if you already have Bun, skip the binary and run the package directly:
-
-```bash
-bunx @ontrove/cli            # run without installing
+bunx @ontrove/cli               # run without installing
 bun add --global @ontrove/cli   # or install it globally
 ```
 
-**npm** — installs the package from npm. Note it *runs on Bun* (the CLI is a Bun
-program), so you need Bun on your PATH; the standalone binary above bundles Bun for
-you, `npm` does not:
+**npm** — installs the package from npm. It *runs on Bun*, so you need Bun on your
+PATH:
 
 ```bash
 npm i -g @ontrove/cli
 ```
 
-> The `curl`/Homebrew binaries cover macOS (arm64 + x64), Linux (x64 + arm64), and
-> Windows x64. Windows on ARM has no native binary — use `bunx @ontrove/cli` there.
+> **Standalone binaries coming soon.** `trove` also builds as a self-contained
+> single binary (`bun build --compile`) with the Bun runtime and `@ontrove/*`
+> embedded — no Node, no Bun, no toolchain. A `curl`-install one-liner and a
+> Homebrew formula covering macOS (arm64 + x64), Linux (x64 + arm64), and Windows
+> x64 are on the way; until they land, use Bun or npm above. (Windows on ARM has
+> no native binary — use `bunx @ontrove/cli` there.)
 
 ## Quickstart
 

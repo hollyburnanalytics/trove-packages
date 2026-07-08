@@ -1,9 +1,9 @@
 # `@ontrove/cli` — the Trove command-line tool
 
-`trove` is a single, scriptable command-line tool for all of Trove: querying your
-knowledge base, capturing documents, authoring sources, and building your own
-toolkits as MCP servers (hosted deployment on Trove's cloud is in preview) — all
-over the one GraphQL API at `api.ontrove.sh/graphql`.
+`trove` is a single, scriptable command-line tool for all of Trove: building and
+deploying the tools you give Claude (your own toolkits, hosted on Trove's cloud),
+capturing documents, authoring sources, and querying everything — all over the
+one GraphQL API at `api.ontrove.sh/graphql`.
 
 > **GraphQL is the API. The CLI is a convenience layer.** Every `trove` command is
 > a thin wrapper over a documented GraphQL operation. The CLI has no privileged
@@ -25,13 +25,13 @@ brew install hollyburnanalytics/tap/trove
 **Shell script** (macOS/Linux):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hollyburnanalytics/trove-packages/main/packaging/install.sh | sh
+curl -fsSL https://ontrove.sh/install.sh | sh
 ```
 
 Windows (x64):
 
 ```powershell
-irm https://raw.githubusercontent.com/hollyburnanalytics/trove-packages/main/packaging/install.ps1 | iex
+irm https://ontrove.sh/install.ps1 | iex
 ```
 
 **Bun / npm** — if you already have Bun, skip the binary and run the package

@@ -1,7 +1,8 @@
 # @ontrove/sdk
 
-The thin standard library for authoring **Trove sources** — the things that fill
-your Library. You write a `sync(ctx)` that fetches new content and returns
+The thin standard library for authoring **Trove sources** — scheduled adapters
+that fetch content into your knowledge base. (Source authoring is an early,
+still-developing surface.) You write a `sync(ctx)` that fetches new content and returns
 documents; the SDK owns the document shape, the typed `ctx` capability object,
 the watermark/cursor model, the local-run harness the CLI drives, and manifest
 validation.

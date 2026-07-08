@@ -1,6 +1,6 @@
 # @ontrove/mcp
 
-The thin standard library for authoring **your own Trove toolkits** — every
+The thin standard library for authoring **your own tools for Claude** — every
 toolkit runs as a full MCP server on Trove's cloud. You declare tools + write
 handlers; the SDK owns the MCP protocol, JSON-RPC, schema validation,
 auth-context injection, secret access, and error envelopes.

@@ -30,6 +30,25 @@ export interface FlagSpec {
 }
 
 /**
+ * Read a value flag's value: the inline `--name=value` part when present,
+ * else the following token. Returns how many extra tokens were consumed so
+ * the caller can advance its loop index.
+ *
+ * @throws {@link CliError} (usage) when the value is missing.
+ */
+export function readFlagValue(
+  argv: string[],
+  index: number,
+  name: string,
+  inlineValue: string | null,
+): { value: string; consumed: number } {
+  if (inlineValue !== null) return { value: inlineValue, consumed: 0 };
+  const next = argv[index + 1];
+  if (next === undefined) throw usageError(`Flag --${name} requires a value.`);
+  return { value: next, consumed: 1 };
+}
+
+/**
  * Parse a command's argv slice into {@link ParsedArgs}.
  *
  * @param argv - The tokens after the command path (no global flags).
@@ -37,10 +56,50 @@ export interface FlagSpec {
  * @returns The parsed arguments.
  * @throws {@link CliError} (usage) when a value flag is missing its value.
  */
+/** A flag token split into its alias-resolved name and inline `=value` (if any). */
+function splitFlagToken(
+  token: string,
+  alias: Record<string, string>,
+): { name: string; inline: string | null } {
+  const eq = token.indexOf('=');
+  const prefixLen = token.startsWith('--') ? 2 : 1;
+  const rawName = (eq === -1 ? token.slice(prefixLen) : token.slice(prefixLen, eq)) || '';
+  return { name: alias[rawName] ?? rawName, inline: eq === -1 ? null : token.slice(eq + 1) };
+}
+
+/** Apply one flag token to the collectors; returns extra tokens consumed. */
+function applyFlag(
+  token: string,
+  argv: string[],
+  index: number,
+  spec: { valueFlags: Set<string>; boolFlags: Set<string>; alias: Record<string, string> },
+  out: { push: (name: string, value: string) => void; bools: Set<string> },
+): number {
+  const { name, inline } = splitFlagToken(token, spec.alias);
+  if (spec.boolFlags.has(name)) {
+    out.bools.add(name);
+    return 0;
+  }
+  if (spec.valueFlags.has(name)) {
+    const { value, consumed } = readFlagValue(argv, index, name, inline);
+    out.push(name, value);
+    return consumed;
+  }
+  if (inline !== null) {
+    // Unknown `--x=y` flag: keep it leniently as a string flag.
+    out.push(name, inline);
+    return 0;
+  }
+  out.bools.add(name);
+  return 0;
+}
+
 export function parseArgs(argv: string[], spec: FlagSpec = {}): ParsedArgs {
-  const valueFlags = new Set(spec.value ?? []);
-  const boolFlags = new Set(spec.boolean ?? []);
-  const alias = spec.alias ?? {};
+  const flagSpec = {
+    valueFlags: new Set(spec.value ?? []),
+    boolFlags: new Set(spec.boolean ?? []),
+    alias: spec.alias ?? {},
+  };
 
   const positionals: string[] = [];
   const flags: Record<string, string[]> = {};
@@ -54,7 +113,6 @@ export function parseArgs(argv: string[], spec: FlagSpec = {}): ParsedArgs {
 
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i] ?? '';
-
     if (token === '--') {
       passthrough = true;
       continue;
@@ -63,29 +121,7 @@ export function parseArgs(argv: string[], spec: FlagSpec = {}): ParsedArgs {
       positionals.push(token);
       continue;
     }
-
-    const eq = token.indexOf('=');
-    const prefixLen = token.startsWith('--') ? 2 : 1;
-    const rawName = (eq === -1 ? token.slice(prefixLen) : token.slice(prefixLen, eq)) || '';
-    const name = alias[rawName] ?? rawName;
-
-    if (boolFlags.has(name)) {
-      bools.add(name);
-    } else if (valueFlags.has(name)) {
-      if (eq !== -1) {
-        push(name, token.slice(eq + 1));
-      } else {
-        const next = argv[i + 1];
-        if (next === undefined) throw usageError(`Flag --${name} requires a value.`);
-        push(name, next);
-        i++;
-      }
-    } else if (eq !== -1) {
-      // Unknown `--x=y` flag: keep it leniently as a string flag.
-      push(name, token.slice(eq + 1));
-    } else {
-      bools.add(name);
-    }
+    i += applyFlag(token, argv, i, flagSpec, { push, bools });
   }
 
   return { positionals, flags, bools };

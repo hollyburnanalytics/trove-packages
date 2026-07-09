@@ -20,7 +20,7 @@ import type { JsonSchema } from './types.js';
  * Detect the runtime peer at load time and pick the matching converter, so both
  * `zod@^3.25` and `zod@^4` produce an equivalent inline JSON Schema 7 object.
  */
-const nativeToJsonSchema = (z as { toJSONSchema?: unknown }).toJSONSchema;
+const nativeToJsonSchema: unknown = (z as { toJSONSchema?: unknown }).toJSONSchema;
 
 /** Convert a Zod schema to a draft-7 JSON Schema, inlining any reused subschemas. */
 function toJsonSchema7(schema: z.ZodTypeAny): Record<string, unknown> {

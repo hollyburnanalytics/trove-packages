@@ -73,18 +73,11 @@ export interface McpDeployDeps {
   bundle?: (entry: string) => Promise<ServerBundle>;
 }
 
-export async function deploy(
-  ctx: CommandContext,
+/** Resolve the deploy name/slug from flags, falling back to the manifest. */
+function resolveNameAndSlug(
   args: ParsedArgs,
-  deps: McpDeployDeps = {},
-): Promise<number> {
-  const dir = flag(args, 'dir') ?? '.';
-  const manifestPath = join(dir, 'manifest.json');
-  if (!existsSync(manifestPath)) {
-    throw usageError(`No manifest.json in '${dir}'. Run 'trove mcp init <name>' first.`);
-  }
-  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>;
-
+  manifest: Record<string, unknown>,
+): { name: string; slug: string } {
   const name =
     flag(args, 'name') ?? (typeof manifest.name === 'string' ? manifest.name : undefined);
   const slug =
@@ -97,6 +90,21 @@ export async function deploy(
   if (!name || !slug) {
     throw usageError('Manifest must provide name and slug/id (or pass --name/--slug).');
   }
+  return { name, slug };
+}
+
+export async function deploy(
+  ctx: CommandContext,
+  args: ParsedArgs,
+  deps: McpDeployDeps = {},
+): Promise<number> {
+  const dir = flag(args, 'dir') ?? '.';
+  const manifestPath = join(dir, 'manifest.json');
+  if (!existsSync(manifestPath)) {
+    throw usageError(`No manifest.json in '${dir}'. Run 'trove mcp init <name>' first.`);
+  }
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>;
+  const { name, slug } = resolveNameAndSlug(args, manifest);
 
   const serverEntry = join(dir, 'server.ts');
   if (!existsSync(serverEntry)) {

@@ -151,7 +151,7 @@ export async function whoami(ctx: CommandContext): Promise<number> {
     apiUrl: profile.apiUrl,
     token: profile.token,
     fetchImpl: ctx.fetchImpl,
-    onAuthFailure: () => refreshActiveToken(ctx.fetchImpl, ctx.configEnv),
+    onAuthFailure: (): Promise<string | null> => refreshActiveToken(ctx.fetchImpl, ctx.configEnv),
   });
   const data = await client.request<{ stats: UserStats }>(
     { query: ops.STATS, operationName: 'CliStats' },

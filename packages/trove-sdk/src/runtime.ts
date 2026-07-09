@@ -163,8 +163,10 @@ export async function runSource<C = Record<string, unknown>>(
 ): Promise<RunResult> {
   const logs: unknown[][] = [];
   const cursor: Watermark = options.cursor ?? { type: 'none' };
-  const fetchImpl: FetchLike = options.fetchImpl ?? ((url, init) => globalThis.fetch(url, init));
-  const now = options.now ?? (() => new Date());
+  const fetchImpl: FetchLike =
+    options.fetchImpl ??
+    ((url: string | URL, init?: RequestInit): Promise<Response> => globalThis.fetch(url, init));
+  const now = options.now ?? ((): Date => new Date());
 
   const ctx: SourceContext<C> = {
     config: options.config ?? ({} as C),

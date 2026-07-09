@@ -12,7 +12,7 @@ import type { ConfigEnv } from './config.js';
 import type { CommandContext } from './context.js';
 import { buildContext, type GlobalFlags } from './context.js';
 import { CliError, ExitCode, type ExitCodeValue, usageError } from './errors.js';
-import { type FlagSpec, parseArgs } from './lib/args.js';
+import { type FlagSpec, type ParsedArgs, parseArgs, readFlagValue } from './lib/args.js';
 import { defaultWriter, type Writer } from './output.js';
 
 /** The CLI's own version, from the package.json embedded at build time. */
@@ -37,8 +37,14 @@ interface Command {
 const COMMANDS: Record<string, Command> = {
   // auth
   login: { spec: auth.flagSpecs.login, run: auth.login },
-  logout: { spec: auth.flagSpecs.logout, run: (ctx) => auth.logout(ctx) },
-  whoami: { spec: auth.flagSpecs.whoami, run: (ctx) => auth.whoami(ctx) },
+  logout: {
+    spec: auth.flagSpecs.logout,
+    run: (ctx: CommandContext): Promise<number> => auth.logout(ctx),
+  },
+  whoami: {
+    spec: auth.flagSpecs.whoami,
+    run: (ctx: CommandContext): Promise<number> => auth.whoami(ctx),
+  },
   // query
   search: { spec: query.flagSpecs.search, run: query.search },
   discover: { spec: query.flagSpecs.discover, run: query.discover },
@@ -47,24 +53,27 @@ const COMMANDS: Record<string, Command> = {
   list: { spec: query.flagSpecs.list, run: query.list },
   sources: { spec: query.flagSpecs.sources, run: query.sources },
   source: { spec: query.flagSpecs.source, run: query.source },
-  stats: { spec: {}, run: (ctx) => query.stats(ctx) },
+  stats: { spec: {}, run: (ctx: CommandContext): Promise<number> => query.stats(ctx) },
   // source dev (local SDK toolchain)
   'source init': { spec: sourceDev.flagSpecs.init, run: sourceDev.init },
-  'source dev': { spec: sourceDev.flagSpecs.dev, run: (ctx, a) => sourceDev.dev(ctx, a) },
+  'source dev': {
+    spec: sourceDev.flagSpecs.dev,
+    run: (ctx: CommandContext, a: ParsedArgs): Promise<number> => sourceDev.dev(ctx, a),
+  },
   'source test': {
     spec: sourceDev.flagSpecs.test,
-    run: (ctx, a) => sourceDev.test(ctx, a),
+    run: (ctx: CommandContext, a: ParsedArgs): Promise<number> => sourceDev.test(ctx, a),
   },
   'source validate': { spec: sourceDev.flagSpecs.validate, run: sourceDev.validate },
   'source sync': {
     spec: sourceDev.flagSpecs.sync,
-    run: (ctx, a) => sourceDev.sync(ctx, a),
+    run: (ctx: CommandContext, a: ParsedArgs): Promise<number> => sourceDev.sync(ctx, a),
   },
   // capture
   save: { spec: capture.flagSpecs.save, run: capture.save },
   ingest: { spec: capture.flagSpecs.ingest, run: capture.ingest },
   // mcp remote management
-  'mcp ls': { spec: {}, run: (ctx) => mcp.ls(ctx) },
+  'mcp ls': { spec: {}, run: (ctx: CommandContext): Promise<number> => mcp.ls(ctx) },
   'mcp deploy': { spec: mcp.flagSpecs.deploy, run: mcp.deploy },
   'mcp pause': { spec: {}, run: mcp.pause },
   'mcp resume': { spec: {}, run: mcp.resume },
@@ -73,7 +82,10 @@ const COMMANDS: Record<string, Command> = {
   deploy: { spec: mcp.flagSpecs.deploy, run: mcp.deploy }, // alias for `mcp deploy`
   // mcp dev (local SDK toolchain)
   'mcp init': { spec: mcpDev.flagSpecs.init, run: mcpDev.init },
-  'mcp dev': { spec: mcpDev.flagSpecs.dev, run: (ctx, a) => mcpDev.dev(ctx, a) },
+  'mcp dev': {
+    spec: mcpDev.flagSpecs.dev,
+    run: (ctx: CommandContext, a: ParsedArgs): Promise<number> => mcpDev.dev(ctx, a),
+  },
   'mcp logs': { spec: mcpDev.flagSpecs.logs, run: mcpDev.logs },
   // secrets
   'secret set': { spec: mcp.flagSpecs.secretSet, run: mcp.secretSet },
@@ -154,47 +166,62 @@ export async function run(options: RunOptions): Promise<ExitCodeValue> {
  * @param argv - The raw argv slice.
  * @returns The resolved global flags plus the remaining command tokens.
  */
+/** Collectors `splitGlobals` fills as it walks argv. */
+interface GlobalCollectors {
+  flags: Set<string>;
+  values: Record<string, string>;
+  rest: string[];
+}
+
+/** Apply one `--name[=value]` token to the collectors; returns extra tokens consumed. */
+function applyGlobalFlag(
+  token: string,
+  argv: string[],
+  index: number,
+  collected: GlobalCollectors,
+): number {
+  const eq = token.indexOf('=');
+  const name = eq === -1 ? token.slice(2) : token.slice(2, eq);
+  if (GLOBAL_BOOL_FLAGS.includes(name)) {
+    collected.flags.add(name);
+    return 0;
+  }
+  if (GLOBAL_VALUE_FLAGS.includes(name)) {
+    const inline = eq === -1 ? null : token.slice(eq + 1);
+    const { value, consumed } = readFlagValue(argv, index, name, inline);
+    collected.values[name] = value;
+    return consumed;
+  }
+  collected.rest.push(token);
+  return 0;
+}
+
 function splitGlobals(argv: string[]): { globals: GlobalFlags; rest: string[] } {
-  const valueSet = new Set(GLOBAL_VALUE_FLAGS);
-  const boolSet = new Set(GLOBAL_BOOL_FLAGS);
-  const rest: string[] = [];
-  const flags = new Set<string>();
-  const values: Record<string, string> = {};
+  const collected: GlobalCollectors = { flags: new Set(), values: {}, rest: [] };
   let passthrough = false;
 
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i] ?? '';
     if (passthrough || !token.startsWith('--')) {
-      if (token === '-h') flags.add('help');
-      else if (token === '-v') flags.add('version');
-      else rest.push(token);
+      if (token === '-h') collected.flags.add('help');
+      else if (token === '-v') collected.flags.add('version');
+      else collected.rest.push(token);
       continue;
     }
     if (token === '--') {
       passthrough = true;
-      rest.push(token);
+      collected.rest.push(token);
       continue;
     }
-    const eq = token.indexOf('=');
-    const name = eq === -1 ? token.slice(2) : token.slice(2, eq);
-
-    if (boolSet.has(name)) {
-      flags.add(name);
-    } else if (valueSet.has(name)) {
-      if (eq !== -1) {
-        values[name] = token.slice(eq + 1);
-      } else {
-        const next = argv[i + 1];
-        if (next === undefined) throw usageError(`Flag --${name} requires a value.`);
-        values[name] = next;
-        i++;
-      }
-    } else {
-      rest.push(token);
-    }
+    i += applyGlobalFlag(token, argv, i, collected);
   }
 
-  const globals: GlobalFlags = {
+  return { globals: toGlobalFlags(collected.flags, collected.values), rest: collected.rest };
+}
+
+/** Assemble the {@link GlobalFlags} record from the collected flag sets. */
+function toGlobalFlags(flags: Set<string>, values: Record<string, string>): GlobalFlags {
+  return {
     json: flags.has('json'),
     jsonl: flags.has('jsonl'),
     human: flags.has('human'),
@@ -205,7 +232,6 @@ function splitGlobals(argv: string[]): { globals: GlobalFlags; rest: string[] } 
     ...(values.profile !== undefined ? { profile: values.profile } : {}),
     ...(values.endpoint !== undefined ? { endpoint: values.endpoint } : {}),
   };
-  return { globals, rest };
 }
 
 /** Match the longest registered command path (2-token then 1-token). */

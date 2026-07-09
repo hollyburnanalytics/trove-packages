@@ -51,7 +51,7 @@ function registerEmbeddedResolver(): void {
   if (embeddedResolverRegistered) return;
   Bun.plugin({
     name: 'ontrove-embedded',
-    setup(build: { module: (specifier: string, cb: () => unknown) => void }) {
+    setup(build: { module: (specifier: string, cb: () => unknown) => void }): void {
       build.module('@ontrove/sdk', () => ({ exports: ontroveSdk, loader: 'object' }));
       build.module('@ontrove/mcp', () => ({ exports: ontroveMcp, loader: 'object' }));
     },
@@ -97,7 +97,7 @@ async function defaultBundleForDeploy(entry: string): Promise<string> {
       plugins: [
         {
           name: 'ontrove-mcp-embedded',
-          setup(build: BunBuildPluginBuilder) {
+          setup(build: BunBuildPluginBuilder): void {
             build.onResolve({ filter: /^@ontrove\/mcp$/ }, () => ({
               path: '@ontrove/mcp',
               namespace: 'ontrove-mcp',
@@ -205,6 +205,30 @@ interface BunBuildPluginBuilder {
  * @returns The deployable bundle string and the extracted tool descriptors.
  * @throws {@link CliError} (usage) when the bundle fails or the entry is not a server.
  */
+/**
+ * Reduce one loaded tool to its cached descriptor (null when it has no name).
+ * Carries the full tools/list metadata so clients see parameters + annotations
+ * (a tool with no annotations falls into the client's "other / needs approval"
+ * bucket instead of "read-only").
+ */
+function toBundledTool(t: Record<string, unknown>): BundledTool | null {
+  if (typeof t?.name !== 'string' || t.name.length === 0) return null;
+  const tool: BundledTool = { name: t.name };
+  if (typeof t.title === 'string') tool.title = t.title;
+  if (typeof t.description === 'string') tool.description = t.description;
+  if (typeof t.inputSchema === 'object' && t.inputSchema !== null) {
+    tool.inputSchema = t.inputSchema;
+  }
+  if (typeof t.outputSchema === 'object' && t.outputSchema !== null) {
+    tool.outputSchema = t.outputSchema;
+  }
+  if (typeof t.annotations === 'object' && t.annotations !== null) {
+    tool.annotations = t.annotations;
+  }
+  if (t.alwaysOn === true) tool.alwaysOn = true;
+  return tool;
+}
+
 export async function bundleServer(
   entry: string,
   options: LoadModuleOptions = {},
@@ -216,24 +240,9 @@ export async function bundleServer(
   if (!server || !Array.isArray(server.tools)) {
     throw usageError(`${entry} default export is not a server (expected defineMcpServer(...)).`);
   }
-  const tools: BundledTool[] = [];
-  for (const t of server.tools) {
-    if (typeof t?.name !== 'string' || t.name.length === 0) continue;
-    // Carry the full tool/list metadata so clients see parameters + annotations
-    // (a tool with no annotations falls into the client's "other / needs
-    // approval" bucket instead of "read-only").
-    const tool: BundledTool = { name: t.name };
-    if (typeof t.title === 'string') tool.title = t.title;
-    if (typeof t.description === 'string') tool.description = t.description;
-    if (typeof t.inputSchema === 'object' && t.inputSchema !== null)
-      tool.inputSchema = t.inputSchema;
-    if (typeof t.outputSchema === 'object' && t.outputSchema !== null)
-      tool.outputSchema = t.outputSchema;
-    if (typeof t.annotations === 'object' && t.annotations !== null)
-      tool.annotations = t.annotations;
-    if (t.alwaysOn === true) tool.alwaysOn = true;
-    tools.push(tool);
-  }
+  const tools = server.tools
+    .map((t) => toBundledTool(t))
+    .filter((tool): tool is BundledTool => tool !== null);
 
   const bundleFor = options.bundleImpl ?? defaultBundleForDeploy;
   const bundle = await bundleFor(entry);

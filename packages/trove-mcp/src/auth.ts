@@ -23,7 +23,7 @@ type FetchLike = (input: string | URL, init?: RequestInit) => Promise<Response>;
  * often rejected by CDNs). An explicit caller `user-agent` always wins (see
  * {@link withDefaultUserAgent}).
  */
-export const DEFAULT_USER_AGENT = '@ontrove/mcp (+https://ontrove.sh)';
+const DEFAULT_USER_AGENT = '@ontrove/mcp (+https://ontrove.sh)';
 
 /**
  * Return `init` with a default `User-Agent` added only when absent. Normalizes
@@ -33,7 +33,7 @@ export const DEFAULT_USER_AGENT = '@ontrove/mcp (+https://ontrove.sh)';
  * @param init - The original request init (optional).
  * @returns A new init whose `headers` is a {@link Headers} carrying a UA.
  */
-export function withDefaultUserAgent(init?: RequestInit): RequestInit {
+function withDefaultUserAgent(init?: RequestInit): RequestInit {
   const headers = new Headers(init?.headers);
   if (!headers.has('user-agent')) {
     headers.set('user-agent', DEFAULT_USER_AGENT);

@@ -151,7 +151,7 @@ export async function loadModule<T = unknown>(
 }
 
 /** A cached tool descriptor extracted from a bundled server's `tools/list`. */
-export interface BundledTool {
+interface BundledTool {
   /** The tool name (becomes `{slug}__{name}` on the wire). */
   name: string;
   /** Human-readable display name (MCP `title`), when set. */

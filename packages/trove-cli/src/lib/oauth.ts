@@ -25,7 +25,7 @@ import { CliError, ExitCode } from '../errors.js';
  */
 
 /** OAuth protected-resource metadata (RFC 9728), the fields the CLI reads. */
-export interface ProtectedResourceMetadata {
+interface ProtectedResourceMetadata {
   /** The authorization servers that issue tokens for this resource. */
   authorization_servers?: string[];
 }
@@ -374,14 +374,14 @@ export async function refreshAccessToken(
 }
 
 /** The loopback redirect path the callback server listens on. */
-export const REDIRECT_PATH = '/callback';
+const REDIRECT_PATH = '/callback';
 
 /**
  * The fixed loopback port the callback server binds. Dynamic client registration
  * pins the redirect URI to an exact `host:port`, so the port must be stable
  * across logins for a cached client id to keep working.
  */
-export const LOOPBACK_PORT = 9876;
+const LOOPBACK_PORT = 9876;
 
 /**
  * Run the full loopback authorization-code + PKCE flow end-to-end.

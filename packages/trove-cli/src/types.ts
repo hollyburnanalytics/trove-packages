@@ -23,7 +23,7 @@ export interface Document {
 }
 
 /** A single search/discover hit. */
-export interface SearchResult {
+interface SearchResult {
   relevanceScore: number;
   snippet: string;
   document: Document;

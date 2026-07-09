@@ -26,6 +26,12 @@ jobs:
       - name: Lint (Biome)
         run: bun run lint
 
+      - name: Unused exports/types/files (knip)
+        run: bun run lint:knip
+
+      - name: Lint ratchet (warn-level debt may only shrink)
+        run: bun run lint:baseline
+
       - name: Typecheck
         run: bun run typecheck
 

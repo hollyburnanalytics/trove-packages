@@ -17,17 +17,23 @@
     "test": "bun run --filter '*' test",
     "test:coverage": "bun run --filter '*' test:coverage",
     "lint": "bun run --filter '*' lint",
+    "lint:knip": "knip --include exports,types,files,duplicates",
+    "lint:baseline": "node scripts/lint-baseline.mjs",
     "typecheck": "bun run --filter '*' typecheck",
     "refs:check": "node scripts/check-no-internal-refs.mjs",
     "docs:examples": "node scripts/check-doc-examples.mjs",
     "api:docs": "typedoc",
-    "check": "bun run build && bun run lint && bun run typecheck && bun run test:coverage && bun run refs:check && bun run docs:examples",
+    "check": "bun run build && bun run lint && bun run lint:knip && bun run lint:baseline && bun run typecheck && bun run test:coverage && bun run refs:check && bun run docs:examples",
+    "prepare": "lefthook install",
     "changeset": "changeset",
     "version": "changeset version",
     "release": "bun run build && changeset publish"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.8",
     "@changesets/cli": "^2.27.9",
+    "knip": "^6.25.0",
+    "lefthook": "^2.1.10",
     "typedoc": "^0.28.0",
     "typedoc-plugin-markdown": "^4.4.0"
   }

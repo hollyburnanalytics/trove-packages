@@ -10,10 +10,10 @@ export const DEFAULT_API_URL = 'https://api.ontrove.sh';
 /** The default Clerk issuer used for the device/loopback login flow. */
 export const DEFAULT_ISSUER = 'https://accounts.ontrove.sh';
 /** The default profile name when none is configured. */
-export const DEFAULT_PROFILE = 'prod';
+const DEFAULT_PROFILE = 'prod';
 
 /** A single named environment + identity in `~/.trove/config.toml`. */
-export interface Profile {
+interface Profile {
   /** Profile name (the table key under `[profiles.<name>]`). */
   name: string;
   /** GraphQL API base URL; `/graphql` is appended for requests. */

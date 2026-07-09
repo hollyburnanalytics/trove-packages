@@ -15,7 +15,7 @@ import { platform } from 'node:os';
  */
 
 /** The Keychain/libsecret service name all Trove tokens are stored under. */
-export const KEYCHAIN_SERVICE = 'trove-cli';
+const KEYCHAIN_SERVICE = 'trove-cli';
 
 /**
  * A child-process runner with the same shape as `spawnSync`. Injected so tests

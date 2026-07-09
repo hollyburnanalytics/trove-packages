@@ -1,0 +1,12 @@
+# Fast local gate — keeps the edit→commit loop sub-second so no one routes
+# around it. It runs Biome on STAGED files only (auto-fixing format + safe
+# lints and re-staging), and blocks the commit on any unfixable lint error.
+# The exhaustive tiers — build, typecheck, tests, knip, refs:check — run in
+# CI (`bun run check`), not here, on purpose.
+pre-commit:
+  parallel: true
+  commands:
+    biome:
+      glob: "*.{ts,tsx,js,mjs,json,jsonc}"
+      run: bunx biome check --no-errors-on-unmatched --write --staged {staged_files}
+      stage_fixed: true

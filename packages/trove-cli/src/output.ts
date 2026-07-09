@@ -8,7 +8,7 @@
  */
 
 /** The output format selected for a command. */
-export type OutputFormat = 'human' | 'json' | 'jsonl';
+type OutputFormat = 'human' | 'json' | 'jsonl';
 
 /** Global presentation options resolved from flags + environment. */
 export interface OutputOptions {

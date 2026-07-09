@@ -26,11 +26,11 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "complexity": {
         "noExcessiveCognitiveComplexity": {
-          "level": "error",
-          "options": { "maxAllowedComplexity": 30 }
+          "level": "warn",
+          "options": { "maxAllowedComplexity": 15 }
         }
       },
       "correctness": {
@@ -38,15 +38,31 @@
         "noUnusedImports": "error",
         "useExhaustiveDependencies": "warn"
       },
+      "nursery": {
+        "noFloatingPromises": "error",
+        "noMisusedPromises": "error",
+        "useExplicitType": "warn"
+      },
       "performance": {
-        "noDelete": "warn"
+        "noDelete": "error"
       },
       "style": {
         "noNonNullAssertion": "error",
         "useConst": "error",
         "useImportType": "error",
         "useNodejsImportProtocol": "error",
-        "noParameterAssign": "error"
+        "noParameterAssign": "error",
+        "noExcessiveLinesPerFile": {
+          "level": "warn",
+          "options": { "maxLines": 350 }
+        },
+        "useFilenamingConvention": {
+          "level": "error",
+          "options": {
+            "filenameCases": ["kebab-case"],
+            "requireAscii": true
+          }
+        }
       },
       "suspicious": {
         "noExplicitAny": "error",
@@ -66,10 +82,14 @@
             "noConsole": "off"
           },
           "style": {
-            "noNonNullAssertion": "off"
+            "noNonNullAssertion": "off",
+            "noExcessiveLinesPerFile": "off"
           },
           "complexity": {
             "noExcessiveCognitiveComplexity": "off"
+          },
+          "nursery": {
+            "useExplicitType": "off"
           }
         }
       }

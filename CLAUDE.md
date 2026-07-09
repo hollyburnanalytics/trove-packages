@@ -14,14 +14,19 @@ non-public product internals or hosting implementation.
 
 ```bash
 bun install
-bun run check        # build → lint → typecheck → test (build first: cli needs the sdk/mcp dist)
+bun run check        # build → lint → knip → typecheck → test (build first: cli needs the sdk/mcp dist)
 bun run build        # build sdk + mcp, then cli
 bun run lint         # Biome
+bun run lint:knip    # knip: unused exports/types/files/duplicates
+bun run lint:baseline # ratchet: warn-level lint debt + suppressions may only shrink
 bun run typecheck    # tsc --noEmit, all packages
 bun run test         # vitest, all packages
 bun run refs:check   # guard: no internal references in shipped source (see below)
 bun run api:docs     # local preview of the TypeDoc API reference (git-ignored)
 ```
+
+A lefthook pre-commit hook (installed by `bun install` via `prepare`) runs Biome
+on staged files with autofix. The exhaustive tiers stay in CI/`check`.
 
 Add a **changeset** (`bun run changeset`) for any change to a package's public surface.
 

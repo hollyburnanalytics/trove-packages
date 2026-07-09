@@ -1,0 +1,5 @@
+{
+  "lint/complexity/noExcessiveCognitiveComplexity": 8,
+  "lint/nursery/useExplicitType": 24,
+  "lint/style/noExcessiveLinesPerFile": 3
+}

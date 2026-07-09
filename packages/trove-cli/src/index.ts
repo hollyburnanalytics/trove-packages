@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { run } from './cli.js';
+import type { ExitCodeValue } from './errors.js';
 
 /**
  * The `trove` binary entry point. Delegates to the testable {@link run} core
@@ -10,5 +11,5 @@ import { run } from './cli.js';
  * `trove` runs on Bun: the shipped single-binary embeds it, and the npm package's
  * bin uses the Bun shebang (so an `npm`/`bunx` install runs on the user's Bun).
  */
-const code = await run({ argv: process.argv.slice(2) });
+const code: ExitCodeValue = await run({ argv: process.argv.slice(2) });
 process.exit(code);

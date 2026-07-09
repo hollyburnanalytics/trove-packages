@@ -134,6 +134,43 @@ function normalizeResult(value: ToolResult | string): ToolResult {
  * @returns A map of name → definition and the `tools/list` entries.
  * @throws {Error} On empty/duplicate/invalid tool definitions.
  */
+/** Throw unless one authored tool definition is structurally valid. */
+function assertValidTool(tool: ToolDefinition, registry: Map<string, ToolDefinition>): void {
+  if (typeof tool.name !== 'string' || !TOOL_NAME_RE.test(tool.name)) {
+    throw new Error(`defineMcpServer: invalid tool name "${String(tool.name)}"`);
+  }
+  if (registry.has(tool.name)) {
+    throw new Error(`defineMcpServer: duplicate tool name "${tool.name}"`);
+  }
+  if (typeof tool.description !== 'string' || tool.description.length === 0) {
+    throw new Error(`defineMcpServer: tool "${tool.name}" needs a non-empty description`);
+  }
+  if (typeof tool.handler !== 'function') {
+    throw new Error(`defineMcpServer: tool "${tool.name}" needs a handler function`);
+  }
+  if (tool.input === undefined || typeof tool.input.safeParse !== 'function') {
+    throw new Error(`defineMcpServer: tool "${tool.name}" needs a Zod schema for \`input\``);
+  }
+  if (tool.output !== undefined && typeof tool.output.safeParse !== 'function') {
+    throw new Error(`defineMcpServer: tool "${tool.name}" \`output\` must be a Zod schema`);
+  }
+}
+
+/** Build the `tools/list` entry for one validated tool. */
+function toListEntry(tool: ToolDefinition, serverWrites: boolean): ToolListEntry {
+  const entry: ToolListEntry = {
+    name: tool.name,
+    description: tool.description,
+    inputSchema: compileInputSchema(tool.input),
+    annotations: deriveAnnotations(tool, serverWrites),
+  };
+  if (typeof tool.title === 'string' && tool.title.length > 0) entry.title = tool.title;
+  if (tool.output !== undefined) entry.outputSchema = compileInputSchema(tool.output);
+  if (tool.alwaysOn !== undefined) entry.alwaysOn = tool.alwaysOn;
+  if (tool.mutating !== undefined) entry.mutating = tool.mutating;
+  return entry;
+}
+
 function compileTools(
   tools: ReadonlyArray<ToolDefinition>,
   serverWrites: boolean,
@@ -147,43 +184,11 @@ function compileTools(
 
   const registry = new Map<string, ToolDefinition>();
   const list: ToolListEntry[] = [];
-
   for (const tool of tools) {
-    if (typeof tool.name !== 'string' || !TOOL_NAME_RE.test(tool.name)) {
-      throw new Error(`defineMcpServer: invalid tool name "${String(tool.name)}"`);
-    }
-    if (registry.has(tool.name)) {
-      throw new Error(`defineMcpServer: duplicate tool name "${tool.name}"`);
-    }
-    if (typeof tool.description !== 'string' || tool.description.length === 0) {
-      throw new Error(`defineMcpServer: tool "${tool.name}" needs a non-empty description`);
-    }
-    if (typeof tool.handler !== 'function') {
-      throw new Error(`defineMcpServer: tool "${tool.name}" needs a handler function`);
-    }
-    if (tool.input === undefined || typeof tool.input.safeParse !== 'function') {
-      throw new Error(`defineMcpServer: tool "${tool.name}" needs a Zod schema for \`input\``);
-    }
-    if (tool.output !== undefined && typeof tool.output.safeParse !== 'function') {
-      throw new Error(`defineMcpServer: tool "${tool.name}" \`output\` must be a Zod schema`);
-    }
-
-    const inputSchema = compileInputSchema(tool.input);
-    const entry: ToolListEntry = {
-      name: tool.name,
-      description: tool.description,
-      inputSchema,
-      annotations: deriveAnnotations(tool, serverWrites),
-    };
-    if (typeof tool.title === 'string' && tool.title.length > 0) entry.title = tool.title;
-    if (tool.output !== undefined) entry.outputSchema = compileInputSchema(tool.output);
-    if (tool.alwaysOn !== undefined) entry.alwaysOn = tool.alwaysOn;
-    if (tool.mutating !== undefined) entry.mutating = tool.mutating;
-
+    assertValidTool(tool, registry);
     registry.set(tool.name, tool);
-    list.push(entry);
+    list.push(toListEntry(tool, serverWrites));
   }
-
   return { registry, list };
 }
 
@@ -245,7 +250,9 @@ export function defineMcpServer(
   const serverWrites = (config.scopes ?? []).some((s) => s === INGEST_SCOPE);
   validateAuth(config.auth);
   const { registry, list } = compileTools(config.tools, serverWrites);
-  const fetchImpl: FetchLike = options.fetchImpl ?? ((url, init) => globalThis.fetch(url, init));
+  const fetchImpl: FetchLike =
+    options.fetchImpl ??
+    ((url: string | URL, init?: RequestInit): Promise<Response> => globalThis.fetch(url, init));
 
   async function handle(call: McpToolCall): Promise<McpToolCallResult> {
     if (call === null || typeof call !== 'object' || typeof call.tool !== 'string') {
@@ -282,7 +289,7 @@ export function defineMcpServer(
       callbackBase: call.callbackBase,
       troveEnabled: (call.scopes ?? []).some((s) => s === 'trove:search' || s === 'trove:ingest'),
       fetchImpl,
-      logSink: (args) => {
+      logSink: (args: unknown[]): void => {
         logBuffer.push(args);
       },
       knownSecrets,

@@ -195,17 +195,47 @@ export function makeEgressFetch(
  * @param doFetch - The wrapped `ctx.fetch`.
  * @returns The `ctx.fetchJson` implementation.
  */
+/** The structural slice of a Zod schema `ctx.fetchJson` validates with. */
+interface FetchJsonSchema {
+  safeParse: (v: unknown) => {
+    success: boolean;
+    data?: unknown;
+    error?: { issues: { message: string }[] };
+  };
+}
+
+/** Map a non-2xx response to a {@link ToolError}, honoring the caller's errorMap. */
+function httpToolError(
+  res: Response,
+  body: string,
+  errorMap?: (res: Response, body: string) => ToolError | undefined,
+): ToolError {
+  const mapped = errorMap?.(res, body);
+  if (mapped) return mapped;
+  return new ToolError(`Upstream returned HTTP ${res.status}.`, {
+    retryable: res.status === 429 || res.status >= 500,
+  });
+}
+
+/** Validate a parsed body against the caller's schema; failures are retryable. */
+function validateAgainstSchema(schema: FetchJsonSchema, data: unknown): unknown {
+  const parsed = schema.safeParse(data);
+  if (parsed.success) return parsed.data;
+  const detail = (parsed.error?.issues ?? [])
+    .map((i) => i.message)
+    .join('; ')
+    .slice(0, 200);
+  throw new ToolError(
+    `Upstream response did not match the expected shape${detail ? `: ${detail}` : ''}.`,
+    { retryable: true },
+  );
+}
+
 export function makeFetchJson(doFetch: ToolContext['fetch']): ToolContext['fetchJson'] {
   return (async (
     url: string | URL,
     opts?: {
-      schema?: {
-        safeParse: (v: unknown) => {
-          success: boolean;
-          data?: unknown;
-          error?: { issues: { message: string }[] };
-        };
-      };
+      schema?: FetchJsonSchema;
       init?: RequestInit;
       errorMap?: (res: Response, body: string) => ToolError | undefined;
     },
@@ -223,11 +253,7 @@ export function makeFetchJson(doFetch: ToolContext['fetch']): ToolContext['fetch
     }
     if (!res.ok) {
       const bodyText = await res.text().catch(() => '');
-      const mapped = opts?.errorMap?.(res, bodyText);
-      if (mapped) throw mapped;
-      throw new ToolError(`Upstream returned HTTP ${res.status}.`, {
-        retryable: res.status === 429 || res.status >= 500,
-      });
+      throw httpToolError(res, bodyText, opts?.errorMap);
     }
     const text = await res.text().catch(() => '');
     let data: unknown;
@@ -238,22 +264,6 @@ export function makeFetchJson(doFetch: ToolContext['fetch']): ToolContext['fetch
         retryable: true,
       });
     }
-    if (opts?.schema) {
-      const parsed = opts.schema.safeParse(data);
-      if (!parsed.success) {
-        const detail = (parsed.error?.issues ?? [])
-          .map((i) => i.message)
-          .join('; ')
-          .slice(0, 200);
-        throw new ToolError(
-          `Upstream response did not match the expected shape${detail ? `: ${detail}` : ''}.`,
-          {
-            retryable: true,
-          },
-        );
-      }
-      return parsed.data;
-    }
-    return data;
+    return opts?.schema ? validateAgainstSchema(opts.schema, data) : data;
   }) as ToolContext['fetchJson'];
 }

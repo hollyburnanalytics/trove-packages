@@ -36,7 +36,11 @@ export interface KeychainEnv {
 }
 
 /** The default `spawnSync`, fixed to capture UTF-8 stdout. */
-const defaultSpawn: SpawnSync = (command, args, options) =>
+const defaultSpawn: SpawnSync = (
+  command: string,
+  args: string[],
+  options?: { input?: string },
+): SpawnSyncReturns<string> =>
   spawnSync(command, args, {
     encoding: 'utf8',
     ...(options?.input !== undefined ? { input: options.input } : {}),

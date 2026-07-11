@@ -61,12 +61,32 @@ export interface TroveDocument {
 export interface TroveIngestDoc {
   /** The document title. */
   title: string;
-  /** The full document text to index. */
-  text: string;
+  /**
+   * The document text to index. Optional when a {@link fileUrl}/{@link audioUrl}
+   * is supplied (the captured file becomes the body); required otherwise.
+   */
+  text?: string;
   /** Optional canonical URL of the source. */
   url?: string;
   /** Optional author / byline. */
   author?: string;
+  /**
+   * A file to capture into the knowledge base by URL (PDF, audio, …). Trove
+   * fetches and stores the artifact; with {@link captureOnly} it is retained
+   * as-is, otherwise it is processed (PDF → text, audio → transcript) when the
+   * tenant is entitled. Public-internet URL only (egress is SSRF-guarded).
+   */
+  fileUrl?: string;
+  /** Back-compat alias for an audio file URL; treated as `fileUrl` + `audio/mpeg`. */
+  audioUrl?: string;
+  /** MIME type for {@link fileUrl} (e.g. `application/pdf`, `audio/mpeg`). */
+  mimeType?: string;
+  /**
+   * Store the artifact + a searchable metadata record only; skip the AI
+   * processing (transcription / text extraction). Lets a caller capture now and
+   * enrich later, decoupled from the (possibly gated, possibly costly) pipeline.
+   */
+  captureOnly?: boolean;
 }
 
 /**

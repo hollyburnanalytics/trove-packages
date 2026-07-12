@@ -64,6 +64,7 @@ export type {
   TroveClient,
   TroveDocument,
   TroveIngestDoc,
+  TroveIngestFeed,
   TroveIngestResult,
   TroveSearchOpts,
   TroveSearchResult,

@@ -1,5 +1,11 @@
 # @ontrove/sdk
 
+## 0.5.0
+
+### Patch Changes
+
+- 12ff00e: Docs: align README one-liners to the v2 positioning — lead with "the tools you give Claude" (capabilities Claude doesn't have on its own), not the knowledge base. No API changes.
+
 ## 0.4.0
 
 ## 0.3.3

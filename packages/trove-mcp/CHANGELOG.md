@@ -1,5 +1,29 @@
 # @ontrove/mcp
 
+## 0.5.0
+
+### Minor Changes
+
+- f70cd98: `ctx.trove.ingest` documents can now capture a file by URL. `TroveIngestDoc`
+  gains `fileUrl`/`audioUrl` + `mimeType` (the file Trove fetches and stores) and a
+  `captureOnly` flag that retains the artifact plus a searchable metadata record
+  without running the AI processing (transcription / text extraction) — so a
+  toolkit can capture now and enrich later. `text` is now optional when a file is
+  supplied.
+- 8103348: `ctx.trove.ingest` documents can now declare the **feed** (sub-group) they
+  belong to within the toolkit's source. `TroveIngestDoc` gains an optional
+  `feed: { key, name, label? }` (and the new `TroveIngestFeed` type): `key` is the
+  grouping entity's stable upstream id (a channel id, CIK, series id, …) and the
+  dedup boundary, `name` its display name, and `label` an optional word for what it
+  groups by ("Channel", "Show", "Company"). Omit it and a toolkit's documents form
+  one flat list under its source; declare it and they cluster into named feeds. The
+  toolkit's source itself is attributed automatically from the verified toolkit
+  identity — the toolkit only chooses how (and whether) to subdivide.
+
+### Patch Changes
+
+- 12ff00e: Docs: align README one-liners to the v2 positioning — lead with "the tools you give Claude" (capabilities Claude doesn't have on its own), not the knowledge base. No API changes.
+
 ## 0.4.0
 
 ### Minor Changes

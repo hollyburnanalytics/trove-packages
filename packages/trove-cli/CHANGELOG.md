@@ -1,5 +1,26 @@
 # @ontrove/cli
 
+## 0.5.0
+
+### Minor Changes
+
+- 9b861f4: `trove search` gains a `--sort` option (`relevance` | `published` | `ingested`):
+  `relevance` (default) keeps the search ranking, `published` re-sorts the top
+  relevant matches newest-published first, and `ingested` orders by most-recently
+  added. `trove get` now shows both date axes — `published` (when the content was
+  created) and `indexed` (when Trove ingested it) — plus the per-stage processing
+  timestamps (audio downloaded / transcribed / extracted / embedded / last
+  processed) for the stages a document actually went through.
+
+### Patch Changes
+
+- 12ff00e: Docs: align README one-liners to the v2 positioning — lead with "the tools you give Claude" (capabilities Claude doesn't have on its own), not the knowledge base. No API changes.
+- Updated dependencies [f70cd98]
+- Updated dependencies [12ff00e]
+- Updated dependencies [8103348]
+  - @ontrove/mcp@0.5.0
+  - @ontrove/sdk@0.5.0
+
 ## 0.4.0
 
 ### Patch Changes

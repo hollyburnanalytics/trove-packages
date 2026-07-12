@@ -56,6 +56,27 @@ export interface TroveDocument {
 }
 
 /**
+ * The feed (sub-grouping) a document belongs to within its toolkit's source —
+ * the toolkit's own choice of grouping entity: a channel, show, account,
+ * company, series, property, and so on. Optional: omit it and a toolkit's
+ * documents form one flat list under its source; declare it and they cluster
+ * into named feeds. The `key` is the entity's stable upstream id, so re-saving
+ * the same entity lands in the same feed (it is also the dedup boundary).
+ */
+export interface TroveIngestFeed {
+  /** Stable upstream id of the grouping entity (channel id, CIK, series id, …). */
+  key: string;
+  /** Human-readable feed name (e.g. "MKBHD", "Apple Inc.", "Real GDP"). */
+  name: string;
+  /**
+   * Optional word for what kind of thing this feed is — "Channel", "Show",
+   * "Company", "Series" — so a client can label the grouping ("grouped by
+   * Company") rather than the generic "feed".
+   */
+  label?: string;
+}
+
+/**
  * A document to write into the knowledge base via {@link TroveClient.ingest}.
  */
 export interface TroveIngestDoc {
@@ -87,6 +108,12 @@ export interface TroveIngestDoc {
    * enrich later, decoupled from the (possibly gated, possibly costly) pipeline.
    */
   captureOnly?: boolean;
+  /**
+   * The feed (sub-grouping) this document belongs to within the toolkit's
+   * source. Optional — omit for a flat list under the source. See
+   * {@link TroveIngestFeed}.
+   */
+  feed?: TroveIngestFeed;
 }
 
 /**

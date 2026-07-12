@@ -22,7 +22,18 @@ export { sliceWords } from './query-format.js';
 
 /** Shared flag spec for the search-family commands. */
 const SEARCH_FLAGS = {
-  value: ['source', 'source-type', 'author', 'after', 'before', 'type', 'tag', 'feed', 'limit'],
+  value: [
+    'source',
+    'source-type',
+    'author',
+    'after',
+    'before',
+    'type',
+    'tag',
+    'feed',
+    'limit',
+    'sort',
+  ],
   alias: { l: 'limit' },
 };
 
@@ -82,9 +93,16 @@ async function searchVariables(
 /** `trove search <query>` → `query search`. */
 export async function search(ctx: CommandContext, args: ParsedArgs): Promise<number> {
   const query = args.positionals.join(' ').trim();
-  if (!query) throw usageError('Usage: trove search <query> [--source ...] [--limit N]');
+  if (!query)
+    throw usageError(
+      'Usage: trove search <query> [--source ...] [--sort relevance|published|ingested] [--limit N]',
+    );
   const vars = await searchVariables(ctx, args);
   vars.query = query;
+  // Search-only ordering: RELEVANCE (default) | PUBLISHED | INGESTED. Uppercased
+  // to the SearchSortField enum, mirroring `list`'s --sort. The server validates.
+  const sort = flag(args, 'sort');
+  if (sort !== undefined) vars.sortBy = sort.toUpperCase();
   const data = await ctx
     .client()
     .request<{ search: SearchResults }>(

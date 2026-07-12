@@ -20,6 +20,13 @@ export interface Document {
   fullText?: string | null;
   externalId?: string;
   feed?: { id: string; name: string } | null;
+  // Per-stage processing timestamps — selected only by `get` (the single-document
+  // view), so absent on search/list results.
+  audioDownloadedAt?: string | null;
+  transcribedAt?: string | null;
+  extractedAt?: string | null;
+  embeddedAt?: string | null;
+  lastProcessedAt?: string | null;
 }
 
 /** A single search/discover hit. */

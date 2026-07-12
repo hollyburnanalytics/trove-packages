@@ -118,16 +118,28 @@ export function emitWordSlice(
 
 /** Format one full document for human reading (record header + full text). */
 export function formatDocument(ctx: CommandContext, doc: Document): string {
-  const header = renderRecord(
-    [
-      ['title', doc.title ?? '(untitled)'],
-      ['author', doc.author ?? '—'],
-      ['source', doc.source.name],
-      ['url', doc.url ?? '—'],
-      ['handle', `[doc:${doc.id}]`],
-    ],
-    ctx.style,
-  );
+  const rows: Array<[string, string]> = [
+    ['title', doc.title ?? '(untitled)'],
+    ['author', doc.author ?? '—'],
+    ['source', doc.source.name],
+    ['url', doc.url ?? '—'],
+    ['handle', `[doc:${doc.id}]`],
+    // The two date axes: when the content was published vs when Trove ingested it.
+    ['published', doc.contentDate ?? '—'],
+    ['indexed', doc.indexedAt],
+  ];
+  // Per-stage processing lineage, shown only for the stages a document actually
+  // went through (audio/transcription apply to podcasts, extraction to articles).
+  for (const [label, value] of [
+    ['audio downloaded', doc.audioDownloadedAt],
+    ['transcribed', doc.transcribedAt],
+    ['extracted', doc.extractedAt],
+    ['embedded', doc.embeddedAt],
+    ['last processed', doc.lastProcessedAt],
+  ] as const) {
+    if (value) rows.push([label, value]);
+  }
+  const header = renderRecord(rows, ctx.style);
   const text = doc.fullText ?? doc.previewText ?? '';
   return `${header}\n\n${text}`;
 }

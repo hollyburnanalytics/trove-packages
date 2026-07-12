@@ -38,6 +38,7 @@ export const SEARCH = /* GraphQL */ `
     $tags: [String!]
     $feedId: ID
     $limit: Int
+    $sortBy: SearchSortField
   ) {
     search(
       query: $query
@@ -50,6 +51,7 @@ export const SEARCH = /* GraphQL */ `
       tags: $tags
       feedId: $feedId
       limit: $limit
+      sortBy: $sortBy
     ) {
       totalMatches
       queryTimeMs
@@ -115,6 +117,11 @@ export const GET_DOCUMENT = /* GraphQL */ `
   query CliGetDocument($id: ID!) {
     document(id: $id) {
       ${DOCUMENT_FIELDS}
+      audioDownloadedAt
+      transcribedAt
+      extractedAt
+      embeddedAt
+      lastProcessedAt
       fullText
       externalId
       feed { id name }

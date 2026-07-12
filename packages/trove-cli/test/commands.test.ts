@@ -128,6 +128,14 @@ describe('command → GraphQL mapping', () => {
     });
   });
 
+  it('search --sort maps to the SearchSortField variable (uppercased)', async () => {
+    const mock = mockFetch({
+      data: { search: { totalMatches: 0, queryTimeMs: 1, results: [] } },
+    });
+    await runCli(['search', 'x', '--sort', 'published'], mock, writer, home);
+    expect(mock.calls[0]?.variables).toMatchObject({ sortBy: 'PUBLISHED' });
+  });
+
   it('discover → query CliDiscover with its own filter subset', async () => {
     const mock = mockFetch({
       data: { discover: { totalMatches: 0, queryTimeMs: 1, results: [] } },
@@ -280,6 +288,49 @@ describe('command → GraphQL mapping', () => {
     });
     expect(w.stdoutText()).toContain('(untitled)');
     expect(w.stdoutText()).toContain('preview');
+    // Both date axes render; a missing publish date falls back to —.
+    expect(w.stdoutText()).toContain('published');
+    expect(w.stdoutText()).toContain('indexed');
+  });
+
+  it('get human view shows per-stage processing timestamps when present', async () => {
+    const mock = mockFetch({
+      data: {
+        document: {
+          id: 'd_1',
+          title: 'Episode',
+          author: 'Show',
+          url: null,
+          contentType: 'TRANSCRIPT',
+          tags: [],
+          wordCount: 1,
+          previewText: 'p',
+          indexedAt: '2026-06-20T00:00:00Z',
+          contentDate: '2026-06-15',
+          source: { id: 'c', name: 'Podcasts', sourceType: 't' },
+          audioDownloadedAt: '2026-06-19T00:00:00Z',
+          transcribedAt: '2026-06-19T01:00:00Z',
+          embeddedAt: '2026-06-19T02:00:00Z',
+          lastProcessedAt: '2026-06-19T02:00:00Z',
+          fullText: 'body',
+        },
+      },
+    });
+    const w = captureWriter();
+    await run({
+      argv: ['get', 'd_1'],
+      writer: w,
+      fetchImpl: mock.fetch,
+      isTTY: true,
+      configEnv: { home: home.home, env: { TROVE_TOKEN: 'tok', NO_COLOR: '1' } },
+    });
+    const out = w.stdoutText();
+    expect(out).toContain('audio downloaded');
+    expect(out).toContain('transcribed');
+    expect(out).toContain('embedded');
+    expect(out).toContain('last processed');
+    // A stage the document never went through (extraction) is omitted, not shown as —.
+    expect(out).not.toContain('extracted');
   });
 
   it('get word paging (human) prints the slice and a continuation hint', async () => {

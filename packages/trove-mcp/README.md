@@ -173,6 +173,73 @@ scopes the Bearer to a single host so the token never leaks to another egress
 target. When you only need a
 static key as a query param or header, use `requireSecret` instead.
 
+### `ctx.trove` — reading and writing the knowledge base
+
+Present only when the manifest `scopes` asked for it: `trove:search` gives you
+`search` / `getDocument`, `trove:ingest` gives you `ingest`. Reads and writes are
+scoped to the calling user's own knowledge base.
+
+```ts no-typecheck
+async handler({ id }, ctx) {
+  const paper = await fetchPaper(ctx, id);
+  const { ingested } = await ctx.trove!.ingest([
+    {
+      title: paper.title,
+      text: paper.abstract,
+      url: paper.url,
+      author: paper.authors.join(', '),
+      feed: { key: paper.category, name: paper.category, label: 'Category' },
+    },
+  ]);
+  return `Saved ${ingested} paper.`;
+}
+```
+
+You never name a source: a saved document is attributed to **your toolkit**
+automatically, from the toolkit identity the runtime verified for this
+invocation. A caller cannot forge that attribution, and you cannot write into
+another toolkit's documents.
+
+Each `TroveIngestDoc`:
+
+| Field | Description |
+|---|---|
+| `title` | Required. The document title. |
+| `text` | The body to index. Optional when you supply a `fileUrl`/`audioUrl` (the captured file becomes the body); required otherwise. |
+| `url` | Canonical URL of the original. |
+| `author` | Free-text byline. |
+| `fileUrl` | A file to capture by URL (PDF, audio, …). Trove fetches and stores it, then processes it (PDF → text, audio → transcript). Public-internet URL only — egress is SSRF-guarded. |
+| `audioUrl` | Alias for an audio `fileUrl` (implies `audio/mpeg`). |
+| `mimeType` | MIME type for `fileUrl`, e.g. `application/pdf`. |
+| `captureOnly` | Store the artifact plus a searchable metadata record, and skip the AI processing. Capture now, enrich later. |
+| `feed` | The sub-group this document belongs to within your toolkit. See below. |
+
+#### Feeds — grouping your documents
+
+A toolkit's documents can sit in one flat list, or cluster into named **feeds**:
+a YouTube toolkit groups by channel, a podcast toolkit by show, a filings toolkit
+by company, an economic-data toolkit by series. You choose the grouping entity —
+it's the thing a user would say "show me everything from ___" about.
+
+`feed` is optional. Omit it entirely and your documents form a flat list under
+your toolkit. Declare it and they group:
+
+```ts no-typecheck
+feed: {
+  key: 'UCBJycsmduvYEL83R_U4JriQ',  // stable upstream id of the entity
+  name: 'MKBHD',                    // what the user sees
+  label: 'Channel',                 // optional: what kind of thing it is
+}
+```
+
+`key` must be the entity's **stable upstream id**, not its display name — it's
+what makes re-saving the same channel land in the same feed even after a rename,
+and it is the boundary Trove dedups within. `label` is the word a client uses to
+describe the grouping ("grouped by Channel" rather than the generic "feed").
+
+Pick a grouping that is **single-valued and stably keyed**. A joined multi-author
+string is neither, so it makes a poor feed even though it makes a fine `author`.
+
 ## Returning results
 
 Return either a `{ text, structured? }` object or a bare string (shorthand for

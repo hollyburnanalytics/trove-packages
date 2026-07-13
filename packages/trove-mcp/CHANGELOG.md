@@ -1,5 +1,31 @@
 # @ontrove/mcp
 
+## 0.6.0
+
+### Minor Changes
+
+- a9af139: `TroveIngestDoc` gains `date` and `tags`.
+
+  `date` is the content's own **publish** date (ISO 8601) — when the paper, episode
+  or video was published, not when you are saving it. Set it whenever the upstream
+  tells you: only the toolkit knows the real date, and it is what recency ranking
+  and date filters sort on. A document saved without one is only ever as old as the
+  day it was ingested.
+
+  `tags` files the document under free-text tags (trimmed, deduped, max 32 × 64
+  chars).
+
+  Both fields were already accepted by the knowledge base; the SDK simply had no
+  way to express them, so every hosted save landed undated.
+
+### Patch Changes
+
+- 4cbb067: Document the `ctx.trove` knowledge-base client in the README: the full
+  `TroveIngestDoc` field reference (`fileUrl`, `audioUrl`, `mimeType`,
+  `captureOnly`) and the feed API for grouping a toolkit's documents by channel,
+  show, company, or series. No API change — that surface shipped in 0.5.0; the
+  README was simply silent about it.
+
 ## 0.5.0
 
 ### Minor Changes

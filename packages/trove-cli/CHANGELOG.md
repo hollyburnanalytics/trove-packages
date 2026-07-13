@@ -1,5 +1,13 @@
 # @ontrove/cli
 
+## 0.7.0
+
+### Patch Changes
+
+- Updated dependencies [d7f9486]
+  - @ontrove/mcp@0.7.0
+  - @ontrove/sdk@0.7.0
+
 ## 0.6.0
 
 ### Patch Changes

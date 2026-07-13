@@ -92,6 +92,21 @@ export interface TroveIngestDoc {
   /** Optional author / byline. */
   author?: string;
   /**
+   * The content's own publish date — when the paper/episode/video was
+   * **published**, NOT when you are saving it (Trove records the ingest time
+   * separately). ISO 8601; a bare `"2024-05-01"` is fine.
+   *
+   * Set this whenever the upstream tells you. Only the toolkit knows the real
+   * date, and it's what recency ranking and date filters sort on — a document
+   * saved without one is only ever as old as the day it was ingested.
+   */
+  date?: string;
+  /**
+   * Optional tags to file the document under. Trimmed and deduped; at most 32
+   * tags of 64 characters each.
+   */
+  tags?: string[];
+  /**
    * A file to capture into the knowledge base by URL (PDF, audio, …). Trove
    * fetches and stores the artifact; with {@link captureOnly} it is retained
    * as-is, otherwise it is processed (PDF → text, audio → transcript) when the

@@ -188,6 +188,7 @@ async handler({ id }, ctx) {
       text: paper.abstract,
       url: paper.url,
       author: paper.authors.join(', '),
+      date: paper.published, // the paper's publish date, not today
       feed: { key: paper.category, name: paper.category, label: 'Category' },
     },
   ]);
@@ -208,11 +209,28 @@ Each `TroveIngestDoc`:
 | `text` | The body to index. Optional when you supply a `fileUrl`/`audioUrl` (the captured file becomes the body); required otherwise. |
 | `url` | Canonical URL of the original. |
 | `author` | Free-text byline. |
+| `date` | The content's own **publish** date (ISO 8601; a bare `2024-05-01` is fine) — not the time you're saving it, which Trove records separately. See below. |
+| `tags` | Tags to file the document under. Trimmed and deduped; max 32 tags × 64 chars. |
 | `fileUrl` | A file to capture by URL (PDF, audio, …). Trove fetches and stores it, then processes it (PDF → text, audio → transcript). Public-internet URL only — egress is SSRF-guarded. |
 | `audioUrl` | Alias for an audio `fileUrl` (implies `audio/mpeg`). |
 | `mimeType` | MIME type for `fileUrl`, e.g. `application/pdf`. |
 | `captureOnly` | Store the artifact plus a searchable metadata record, and skip the AI processing. Capture now, enrich later. |
 | `feed` | The sub-group this document belongs to within your toolkit. See below. |
+
+#### Dates — always send the publish date
+
+Set `date` whenever the upstream tells you, even approximately. **Only your
+toolkit knows the real one**, and it's what recency ranking and date filters sort
+on. A document saved without it is only ever as old as the day it was ingested,
+so a paper from 2017 and one from last week look equally fresh — which quietly
+degrades every date-aware query the user makes later.
+
+```ts no-typecheck
+date: paper.published,        // "2017-06-12" — the upstream's own field
+```
+
+Trove normalizes whatever `Date` can parse. A value it can't parse is dropped
+rather than stored, so a malformed date never poisons the ranking.
 
 #### Feeds — grouping your documents
 

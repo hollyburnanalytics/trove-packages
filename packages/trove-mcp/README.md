@@ -188,7 +188,8 @@ async handler({ id }, ctx) {
       text: paper.abstract,
       url: paper.url,
       author: paper.authors.join(', '),
-      date: paper.published, // the paper's publish date, not today
+      date: paper.published,   // the paper's publish date, not today
+      externalId: paper.id,    // re-saving this paper won't duplicate it
       feed: { key: paper.category, name: paper.category, label: 'Category' },
     },
   ]);
@@ -211,11 +212,26 @@ Each `TroveIngestDoc`:
 | `author` | Free-text byline. |
 | `date` | The content's own **publish** date (ISO 8601; a bare `2024-05-01` is fine) — not the time you're saving it, which Trove records separately. See below. |
 | `tags` | Tags to file the document under. Trimmed and deduped; max 32 tags × 64 chars. |
+| `externalId` | The upstream's own stable id (a video id, an arXiv id). The **dedup key**: saving it twice into the same feed returns the existing document instead of a duplicate. See below. |
 | `fileUrl` | A file to capture by URL (PDF, audio, …). Trove fetches and stores it, then processes it (PDF → text, audio → transcript). Public-internet URL only — egress is SSRF-guarded. |
 | `audioUrl` | Alias for an audio `fileUrl` (implies `audio/mpeg`). |
 | `mimeType` | MIME type for `fileUrl`, e.g. `application/pdf`. |
 | `captureOnly` | Store the artifact plus a searchable metadata record, and skip the AI processing. Capture now, enrich later. |
 | `feed` | The sub-group this document belongs to within your toolkit. See below. |
+
+#### `externalId` — so a second save isn't a second document
+
+Set `externalId` to whatever the upstream calls this thing. It is the dedup key
+within the feed, so a user who saves the same video twice ends up with **one**
+document, not two — the second save quietly resolves to the one already there.
+
+```ts no-typecheck
+externalId: video.id,     // "eWKY0OnPByg"
+```
+
+Omit it and every save is a new document. That is right for content with no
+upstream identity (a note, a snippet of a conversation) and wrong for everything
+else.
 
 #### Dates — always send the publish date
 

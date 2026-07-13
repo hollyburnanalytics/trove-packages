@@ -107,6 +107,17 @@ export interface TroveIngestDoc {
    */
   tags?: string[];
   /**
+   * The upstream's own stable id for this content — a video id, an arXiv id, an
+   * episode id. It is the **dedup key**: saving the same `externalId` into the
+   * same {@link feed} twice is idempotent, and the second save returns the
+   * document already there instead of creating a duplicate.
+   *
+   * Set it whenever the upstream has an id, which is nearly always. Omit it and
+   * every save is a new document, so a user who saves the same video twice ends
+   * up with it twice.
+   */
+  externalId?: string;
+  /**
    * A file to capture into the knowledge base by URL (PDF, audio, …). Trove
    * fetches and stores the artifact; with {@link captureOnly} it is retained
    * as-is, otherwise it is processed (PDF → text, audio → transcript) when the

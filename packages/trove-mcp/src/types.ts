@@ -63,6 +63,17 @@ export interface TroveDocument {
  * into named feeds. The `key` is the entity's stable upstream id, so re-saving
  * the same entity lands in the same feed (it is also the dedup boundary).
  */
+/**
+ * The artifact to capture when the preferred one turns out not to exist. See
+ * {@link TroveIngestDoc.fallback}.
+ */
+export interface TroveIngestFallback {
+  /** URL of the fallback artifact — the one that always exists. */
+  fileUrl: string;
+  /** Its MIME type (e.g. `application/pdf`). */
+  mimeType: string;
+}
+
 export interface TroveIngestFeed {
   /** Stable upstream id of the grouping entity (channel id, CIK, series id, …). */
   key: string;
@@ -128,6 +139,22 @@ export interface TroveIngestDoc {
   audioUrl?: string;
   /** MIME type for {@link fileUrl} (e.g. `application/pdf`, `audio/mpeg`). */
   mimeType?: string;
+  /**
+   * A second artifact to capture if {@link fileUrl} isn't there.
+   *
+   * Some sources publish the same document in more than one form, and only one of
+   * them reliably exists. arXiv is the example: it has back-rendered HTML for many
+   * papers but not all, while every paper has a PDF. Without this, a toolkit has to
+   * find out for itself — a HEAD request per candidate, before the save can even
+   * begin, on a tool call the platform cancels after about eight seconds. That is
+   * what made a burst of arXiv saves time out.
+   *
+   * Name the preferred artifact as {@link fileUrl} and the sure thing here, and
+   * Trove finds out which exists SERVER-side, off the tool's clock. A miss costs a
+   * retry nobody is waiting on, and the fallback lands on the same document — it is
+   * a retry, not a second copy.
+   */
+  fallback?: TroveIngestFallback;
   /**
    * Store the artifact + a searchable metadata record only; skip the AI
    * processing (transcription / text extraction). Lets a caller capture now and

@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from 'node:net';
 import { CliError, ExitCode } from '../errors.js';
 import { buildAuthorizeUrl, discoverAuthServer, registerClient } from './oauth-discovery.js';
+import { callbackPage } from './oauth-page.js';
 import { exchangeCode } from './oauth-tokens.js';
 
 /**
@@ -218,19 +219,22 @@ export function loopbackStart(
         res.writeHead(404).end('Not found');
         return;
       }
-      const capturedCode = url.searchParams.get('code') ?? '';
-      const state = url.searchParams.get('state') ?? '';
+
+      const result = readCallback(url);
+      // Tell the BROWSER the truth too. This used to answer "You may close this
+      // window" whatever came back, so a denied or malformed sign-in looked
+      // exactly like a successful one — and the user walked back to a terminal
+      // that had failed, with no idea why.
       res
-        .writeHead(200, { 'content-type': 'text/html' })
-        .end(
-          '<html><body><h2>Trove CLI</h2><p>You may close this window and return to the terminal.</p></body></html>',
-        );
+        .writeHead(result.ok ? 200 : 400, { 'content-type': 'text/html' })
+        .end(callbackPage(result.ok ? { ok: true } : { ok: false, message: result.message }));
+
       server.close();
       clearTimeout(timer);
-      if (capturedCode === '') {
-        rejectCode(new CliError('No authorization code in the callback.', ExitCode.Auth));
+      if (result.ok) {
+        resolveCode({ code: result.code, state: result.state });
       } else {
-        resolveCode({ code: capturedCode, state });
+        rejectCode(new CliError(result.message, ExitCode.Auth));
       }
     });
     const timer = setTimeout(() => {
@@ -245,4 +249,40 @@ export function loopbackStart(
       resolveHandle({ port: boundPort, code });
     });
   });
+}
+
+/** What the browser redirect actually carried. */
+type CallbackResult = { ok: true; code: string; state: string } | { ok: false; message: string };
+
+/**
+ * Read the redirect the browser arrived with.
+ *
+ * An authorization server reports a REFUSAL in the redirect, not by withholding
+ * it: a user who clicks "Deny" still lands on this callback, just carrying
+ * `error=access_denied` instead of a code. Reading only the code — as this once
+ * did — turns that into a success page and a terminal that waits.
+ *
+ * The message is shown in the browser AND becomes the CLI's error, so it is
+ * written for a person: "the sign-in request was denied", not `access_denied`.
+ *
+ * @param url - The callback URL, with its query.
+ * @returns The captured code, or why there isn't one.
+ */
+function readCallback(url: URL): CallbackResult {
+  const error = url.searchParams.get('error') ?? '';
+  const description = url.searchParams.get('error_description') ?? '';
+  const code = url.searchParams.get('code') ?? '';
+  const state = url.searchParams.get('state') ?? '';
+
+  if (error === 'access_denied') return { ok: false, message: 'The sign-in request was denied.' };
+  if (error !== '') {
+    return {
+      ok: false,
+      message: description !== '' ? description : `Authorization failed (${error}).`,
+    };
+  }
+  if (code === '') {
+    return { ok: false, message: 'The callback arrived without an authorization code.' };
+  }
+  return { ok: true, code, state };
 }

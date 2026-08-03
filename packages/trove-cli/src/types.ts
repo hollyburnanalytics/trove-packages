@@ -20,12 +20,22 @@ export interface Document {
   fullText?: string | null;
   externalId?: string;
   feed?: { id: string; name: string } | null;
-  // Per-stage processing timestamps — selected only by `get` (the single-document
-  // view), so absent on search/list results.
-  audioDownloadedAt?: string | null;
-  transcribedAt?: string | null;
-  extractedAt?: string | null;
-  embeddedAt?: string | null;
+  // Where the document is in the pipeline — selected only by `get` (the
+  // single-document view), so absent on search/list results.
+  //
+  // A LIST, not a fixed set of date fields. The five timestamp columns this
+  // replaces meant the CLI decided what the pipeline's stages were, and it
+  // printed a stale list the moment the server's stage set changed.
+  processing?: {
+    inFlight: boolean;
+    degraded?: boolean;
+    stages: {
+      stage: string;
+      status: string;
+      skipReason?: string | null;
+      updatedAt?: string | null;
+    }[];
+  } | null;
   lastProcessedAt?: string | null;
 }
 

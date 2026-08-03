@@ -128,17 +128,23 @@ export function formatDocument(ctx: CommandContext, doc: Document): string {
     ['published', doc.contentDate ?? '—'],
     ['indexed', doc.indexedAt],
   ];
-  // Per-stage processing lineage, shown only for the stages a document actually
-  // went through (audio/transcription apply to podcasts, extraction to articles).
-  for (const [label, value] of [
-    ['audio downloaded', doc.audioDownloadedAt],
-    ['transcribed', doc.transcribedAt],
-    ['extracted', doc.extractedAt],
-    ['embedded', doc.embeddedAt],
-    ['last processed', doc.lastProcessedAt],
-  ] as const) {
-    if (value) rows.push([label, value]);
+  // The processing lineage, as the SERVER reports it.
+  //
+  // This used to be five fixed rows read off five nullable date columns, which
+  // meant the CLI decided what the pipeline's stages were — and it printed a
+  // stale list the moment the server's stage set changed. Those columns are
+  // gone; a loop over the reported stages replaces them, and a sixth stage
+  // appears here with no change to this file.
+  //
+  // A skipped stage is shown rather than hidden: "not needed" answers "why is
+  // there no formatted version of this", which a blank row could not
+  // distinguish from "never ran".
+  for (const stage of doc.processing?.stages ?? []) {
+    const when =
+      stage.status === 'DONE' && stage.updatedAt ? stage.updatedAt : stage.status.toLowerCase();
+    rows.push([stage.stage.toLowerCase(), when]);
   }
+  if (doc.lastProcessedAt) rows.push(['last processed', doc.lastProcessedAt]);
   const header = renderRecord(rows, ctx.style);
   const text = doc.fullText ?? doc.previewText ?? '';
   return `${header}\n\n${text}`;

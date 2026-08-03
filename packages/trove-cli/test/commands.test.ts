@@ -293,7 +293,7 @@ describe('command → GraphQL mapping', () => {
     expect(w.stdoutText()).toContain('indexed');
   });
 
-  it('get human view shows per-stage processing timestamps when present', async () => {
+  it('get human view prints the stages the SERVER reports, not a fixed list', async () => {
     const mock = mockFetch({
       data: {
         document: {
@@ -308,9 +308,16 @@ describe('command → GraphQL mapping', () => {
           indexedAt: '2026-06-20T00:00:00Z',
           contentDate: '2026-06-15',
           source: { id: 'c', name: 'Podcasts', sourceType: 't' },
-          audioDownloadedAt: '2026-06-19T00:00:00Z',
-          transcribedAt: '2026-06-19T01:00:00Z',
-          embeddedAt: '2026-06-19T02:00:00Z',
+          processing: {
+            inFlight: false,
+            degraded: false,
+            stages: [
+              { stage: 'ACQUIRE', status: 'DONE', updatedAt: '2026-06-19T00:00:00Z' },
+              { stage: 'EXTRACT', status: 'DONE', updatedAt: '2026-06-19T01:00:00Z' },
+              { stage: 'FORMAT', status: 'SKIPPED', skipReason: 'VERBATIM_SOURCE' },
+              { stage: 'INDEX', status: 'DONE', updatedAt: '2026-06-19T02:00:00Z' },
+            ],
+          },
           lastProcessedAt: '2026-06-19T02:00:00Z',
           fullText: 'body',
         },
@@ -325,12 +332,21 @@ describe('command → GraphQL mapping', () => {
       configEnv: { home: home.home, env: { TROVE_TOKEN: 'tok', NO_COLOR: '1' } },
     });
     const out = w.stdoutText();
-    expect(out).toContain('audio downloaded');
-    expect(out).toContain('transcribed');
-    expect(out).toContain('embedded');
+    // Exactly the four the server reported, named as it named them. The CLI
+    // used to print a hard-coded list of five date fields, which meant it
+    // decided what the pipeline's stages were — and printed a stale list the
+    // moment the server's stage set changed.
+    expect(out).toContain('acquire');
+    expect(out).toContain('extract');
+    expect(out).toContain('index');
     expect(out).toContain('last processed');
-    // A stage the document never went through (extraction) is omitted, not shown as —.
-    expect(out).not.toContain('extracted');
+    // A SKIPPED stage is shown with its state rather than hidden: "not needed"
+    // answers "why is there no formatted version of this", which a blank row
+    // could not distinguish from "never ran".
+    expect(out).toContain('format');
+    expect(out).toContain('skipped');
+    // A stage the document does not have is absent entirely.
+    expect(out).not.toContain('enrich');
   });
 
   it('get word paging (human) prints the slice and a continuation hint', async () => {

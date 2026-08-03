@@ -117,11 +117,12 @@ export const GET_DOCUMENT = /* GraphQL */ `
   query CliGetDocument($id: ID!) {
     document(id: $id) {
       ${DOCUMENT_FIELDS}
-      audioDownloadedAt
-      transcribedAt
-      extractedAt
-      embeddedAt
       lastProcessedAt
+      processing {
+        inFlight
+        degraded
+        stages { stage status skipReason updatedAt }
+      }
       fullText
       externalId
       feed { id name }

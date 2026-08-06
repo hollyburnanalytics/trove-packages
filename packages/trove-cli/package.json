@@ -1,7 +1,7 @@
 {
   "name": "@ontrove/cli",
-  "version": "0.8.0",
-  "description": "The Trove command-line tool \u2014 a scriptable GraphQL client for your personal knowledge base, and the toolchain for authoring sources and building & deploying toolkits.",
+  "version": "0.9.0",
+  "description": "The Trove command-line tool — a scriptable GraphQL client for your personal knowledge base, and the toolchain for authoring sources and building & deploying toolkits.",
   "type": "module",
   "license": "MIT",
   "author": "Hollyburn Analytics Inc. <matt@hollyburnanalytics.com>",
@@ -50,8 +50,8 @@
     "test:smoke": "bun run build:vendor && bun test test/toolchain.smoke.test.ts"
   },
   "dependencies": {
-    "@ontrove/mcp": "^0.8.0",
-    "@ontrove/sdk": "^0.8.0",
+    "@ontrove/mcp": "^0.9.0",
+    "@ontrove/sdk": "^0.9.0",
     "open": "^10.1.0",
     "zod": "^4"
   },

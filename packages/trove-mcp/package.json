@@ -1,7 +1,7 @@
 {
   "name": "@ontrove/mcp",
-  "version": "0.8.0",
-  "description": "Thin standard library for authoring your own Trove toolkits (each a hosted MCP server) \u2014 defineMcpServer, the ctx capability object, and ToolError.",
+  "version": "0.9.0",
+  "description": "Thin standard library for authoring your own Trove toolkits (each a hosted MCP server) — defineMcpServer, the ctx capability object, and ToolError.",
   "type": "module",
   "license": "MIT",
   "author": "Hollyburn Analytics Inc. <matt@hollyburnanalytics.com>",

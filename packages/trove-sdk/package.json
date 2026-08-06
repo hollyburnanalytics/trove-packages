@@ -1,6 +1,6 @@
 {
   "name": "@ontrove/sdk",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Thin standard library for authoring Trove sources — defineSource, the sync(ctx) capability object, the document shape, the local-run harness, and manifest validation.",
   "type": "module",
   "license": "MIT",

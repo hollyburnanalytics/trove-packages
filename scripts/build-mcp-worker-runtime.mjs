@@ -5,7 +5,7 @@
  * `trove mcp deploy` bundles a user's `server.ts` for the hosted runtime. In the
  * Bun single-binary distribution there is no on-disk `@ontrove/mcp` to bundle
  * (it is embedded in the binary), so we pre-bundle `@ontrove/mcp` — with its deps
- * (`zod`, `zod-to-json-schema`) — into one self-contained worker-target module
+ * (`zod`) — into one self-contained worker-target module
  * once, at build time, and embed the result as a string. The deploy bundler then
  * supplies it to `Bun.build` via a resolver plugin.
  *

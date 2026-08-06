@@ -238,7 +238,7 @@ export interface ToolContext {
    * Keep the schema lenient (`.default()`/`.nullish()`); it is for parsing the
    * upstream shape, not the tool's strict `output` contract.
    */
-  fetchJson<S extends z.ZodTypeAny>(
+  fetchJson<S extends z.ZodType>(
     url: string | URL,
     opts: FetchJsonOpts & { schema: S },
   ): Promise<z.infer<S>>;
@@ -335,10 +335,7 @@ export interface ToolResult {
  * @typeParam I - The Zod schema type for the tool's arguments.
  * @typeParam O - The Zod schema type for the tool's structured output, if declared.
  */
-export interface ToolDefinition<
-  I extends z.ZodTypeAny = z.ZodTypeAny,
-  O extends z.ZodTypeAny = z.ZodTypeAny,
-> {
+export interface ToolDefinition<I extends z.ZodType = z.ZodType, O extends z.ZodType = z.ZodType> {
   /** A short snake_case identifier, unique within the server. */
   name: string;
   /** A human-readable display name for client tool pickers (MCP `title`). */

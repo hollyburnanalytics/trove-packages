@@ -11,32 +11,21 @@
  */
 
 import * as z from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { JsonSchema } from './types.js';
 
 /**
- * Zod 4 ships a native `z.toJSONSchema`; Zod 3 does not (and its internal schema
- * format is incompatible with the `zod-to-json-schema` package's Zod-4 path).
- * Detect the runtime peer at load time and pick the matching converter, so both
- * `zod@^3.25` and `zod@^4` produce an equivalent inline JSON Schema 7 object.
+ * Convert a Zod schema to a draft-7 JSON Schema, inlining any reused subschemas.
+ *
+ * `reused: 'inline'` keeps the output free of `$defs`/`$ref` — MCP clients read
+ * `inputSchema` directly and a reference to a definition they have to resolve is
+ * a needless hurdle. `io: 'input'` describes what a caller PASSES, which is the
+ * side of a transform a tool's arguments are on.
  */
-const nativeToJsonSchema: unknown = (z as { toJSONSchema?: unknown }).toJSONSchema;
-
-/** Convert a Zod schema to a draft-7 JSON Schema, inlining any reused subschemas. */
-function toJsonSchema7(schema: z.ZodTypeAny): Record<string, unknown> {
-  if (typeof nativeToJsonSchema === 'function') {
-    // Zod 4: `reused: 'inline'` matches the Zod-3 `$refStrategy: 'none'` behaviour
-    // (no `$defs`/`$ref`); `io: 'input'` describes what a caller passes in.
-    return (nativeToJsonSchema as (s: unknown, o?: unknown) => Record<string, unknown>)(schema, {
-      target: 'draft-7',
-      reused: 'inline',
-      io: 'input',
-    });
-  }
-  // Zod 3.
-  return zodToJsonSchema(schema, {
-    $refStrategy: 'none',
-    target: 'jsonSchema7',
+function toJsonSchema7(schema: z.ZodType): Record<string, unknown> {
+  return z.toJSONSchema(schema, {
+    target: 'draft-7',
+    reused: 'inline',
+    io: 'input',
   }) as Record<string, unknown>;
 }
 
@@ -45,14 +34,13 @@ function toJsonSchema7(schema: z.ZodTypeAny): Record<string, unknown> {
  *
  * The schema is emitted fully inline, so the result is a self-contained object
  * schema with no top-level `$ref`. A non-object root (e.g. `z.string()`) is
- * rejected — tool arguments are always a named-field object. Works with both
- * `zod@^3.25` and `zod@^4`.
+ * rejected — tool arguments are always a named-field object.
  *
  * @param schema - The Zod schema for a tool's arguments.
  * @returns A JSON Schema object with `type: 'object'`.
  * @throws {Error} If the schema does not compile to an object schema.
  */
-export function compileInputSchema(schema: z.ZodTypeAny): JsonSchema {
+export function compileInputSchema(schema: z.ZodType): JsonSchema {
   const compiled = toJsonSchema7(schema);
 
   if (compiled.type !== 'object') {
@@ -63,9 +51,8 @@ export function compileInputSchema(schema: z.ZodTypeAny): JsonSchema {
 
   // Strip the JSON-Schema `$schema` dialect marker — MCP inputSchema omits it.
   const { $schema: _dialect, ...rest } = compiled;
-  // Default the root to a closed object (`additionalProperties: false`) so the
-  // contract is identical across Zod versions — Zod 3's `zod-to-json-schema`
-  // emits this, Zod 4's native converter does not. An explicit value from the
-  // converter (e.g. `.passthrough()`/`.loose()` → `true`) still wins.
+  // Default the root to a closed object: a tool that quietly accepts unknown
+  // arguments cannot tell a typo from a feature. An explicit value from the
+  // converter (a loose object → `true`) still wins, because `rest` spreads after.
   return { additionalProperties: false, ...rest, type: 'object' } as JsonSchema;
 }

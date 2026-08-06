@@ -427,3 +427,87 @@ describe('defineMcpServer — default fetch wiring', () => {
     expect(new Headers(init.headers).get('user-agent')).toContain('@ontrove/mcp');
   });
 });
+
+/**
+ * A declared `output` schema used to be inert: validated as a schema at compile
+ * time, then never applied. `structuredContent` reached the host unchecked, so a
+ * tool could contradict its own advertised output and nothing noticed. Input had
+ * always been parsed; the asymmetry was never deliberate.
+ */
+describe('defineMcpServer — declared output schemas are enforced', () => {
+  /** A server whose one tool returns whatever `structured` it is handed. */
+  const serverReturning = (structured: unknown) =>
+    defineMcpServer({
+      tools: [
+        {
+          name: 'report',
+          description: 'Returns a report.',
+          input: z.object({}),
+          output: z.object({ count: z.number(), label: z.string() }),
+          handler: async () => ({ text: 'ok', structured }),
+        },
+      ],
+    });
+
+  it('passes structured output that matches the schema', async () => {
+    const result = await serverReturning({ count: 2, label: 'ok' }).handle(
+      call({ tool: 'report' }),
+    );
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.structuredContent).toEqual({ count: 2, label: 'ok' });
+  });
+
+  it('refuses structured output that contradicts the schema', async () => {
+    const result = await serverReturning({ count: 'two', label: 'ok' }).handle(
+      call({ tool: 'report' }),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toMatch(/"report" returned structured output/);
+      expect(result.error).toMatch(/count/);
+      // The handler and its schema disagree; calling again produces the same
+      // disagreement, so there is nothing for a retry to fix.
+      expect(result.retryable).toBe(false);
+    }
+  });
+
+  it('names a missing field rather than failing anonymously', async () => {
+    const result = await serverReturning({ count: 2 }).handle(call({ tool: 'report' }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/label/);
+  });
+
+  it('surfaces the PARSED value, so declared coercions actually apply', async () => {
+    const server = defineMcpServer({
+      tools: [
+        {
+          name: 'counted',
+          description: 'Counts.',
+          input: z.object({}),
+          output: z.object({ count: z.coerce.number() }),
+          handler: async () => ({ text: 'ok', structured: { count: '7' } }),
+        },
+      ],
+    });
+    const result = await server.handle(call({ tool: 'counted' }));
+    expect(result.ok && result.structuredContent).toEqual({ count: 7 });
+  });
+
+  it('leaves a tool that declares no output schema alone', async () => {
+    const server = defineMcpServer({
+      tools: [
+        {
+          name: 'free',
+          description: 'No declared output.',
+          input: z.object({}),
+          handler: async () => ({ text: 'ok', structured: { anything: true } }),
+        },
+      ],
+    });
+    const result = await server.handle(call({ tool: 'free' }));
+    expect(result.ok).toBe(true);
+    // Nothing was declared, so there is nothing to check it against — and it is
+    // not promoted to `structuredContent` either.
+    expect(result.ok && result.structuredContent).toBeUndefined();
+  });
+});

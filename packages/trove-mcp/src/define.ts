@@ -11,6 +11,7 @@
  * @module
  */
 
+import type { z } from 'zod';
 import { buildCtx, type FetchLike } from './ctx.js';
 import { ToolError } from './errors.js';
 import { redactSecrets } from './redact.js';
@@ -217,7 +218,25 @@ async function runHandler(
     const raw = await tool.handler(args, ctx);
     const result = normalizeResult(raw);
     if (tool.output !== undefined && result.structured !== undefined) {
-      return { ok: true, result, structuredContent: result.structured };
+      // The declared schema was validated as a SCHEMA at compile time and then
+      // never used. `structuredContent` went to the host unchecked, so a tool
+      // could contradict its own advertised output and nothing — types or
+      // runtime — would notice. Input has always been parsed here; output now
+      // is too, and the asymmetry was never intentional.
+      const checked = tool.output.safeParse(result.structured);
+      if (!checked.success) {
+        return {
+          ok: false,
+          error: `"${tool.name}" returned structured output that does not match its declared schema: ${checked.error.issues
+            .map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
+            .join('; ')}`,
+          // Not retryable: the handler and its schema disagree, and calling it
+          // again produces the same disagreement.
+          retryable: false,
+          code: 'TOOL_ERROR',
+        };
+      }
+      return { ok: true, result, structuredContent: checked.data };
     }
     return { ok: true, result };
   } catch (err) {
@@ -301,4 +320,41 @@ export function defineMcpServer(
   }
 
   return { tools: list, handle };
+}
+
+/**
+ * Identity helper that keeps a tool's schema type, so its handler's arguments
+ * are typed for real.
+ *
+ * `tools` is an array, and TypeScript does not infer a generic per array
+ * element — every entry falls back to {@link ToolDefinition}'s default and the
+ * handler receives `any`. That has always been true here; Zod 3 hid it because
+ * its `ZodTypeAny` default WAS `any`, so nothing complained.
+ *
+ * Wrapping one definition restores the inference, because the generic is then
+ * captured at the call:
+ *
+ * ```ts
+ * tools: [
+ *   tool({
+ *     name: 'search',
+ *     description: 'Search.',
+ *     input: z.object({ query: z.string() }),
+ *     async handler(args) {
+ *       return args.query.toUpperCase(); // typed, not `any`
+ *     },
+ *   }),
+ * ]
+ * ```
+ *
+ * Purely a type-level device: it returns its argument untouched, costs nothing
+ * at runtime, and is opt-in per tool.
+ *
+ * @param definition - The tool definition.
+ * @returns The same definition, with its schema types preserved.
+ */
+export function tool<I extends z.ZodType, O extends z.ZodType>(
+  definition: ToolDefinition<I, O>,
+): ToolDefinition<I, O> {
+  return definition;
 }

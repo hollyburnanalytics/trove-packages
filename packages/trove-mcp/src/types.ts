@@ -321,11 +321,19 @@ export interface ToolAnnotations {
  *
  * A handler may also return a bare `string` as shorthand for `{ text }`.
  */
-export interface ToolResult {
+export interface ToolResult<S = unknown> {
   /** The model-visible response body. Always provide this. */
   text: string;
-  /** Optional structured data attached to the result. */
-  structured?: unknown;
+  /**
+   * Optional structured data attached to the result.
+   *
+   * Typed by the tool's declared `output` schema when there is one, so a
+   * handler that returns a shape its own schema does not describe is a compile
+   * error at the definition site. Untyped (`unknown`) for a tool that declares
+   * no `output`, and for a definition not wrapped in `tool()` — the generic has
+   * to be captured somewhere for this to mean anything.
+   */
+  structured?: S;
 }
 
 /**
@@ -335,7 +343,19 @@ export interface ToolResult {
  * @typeParam I - The Zod schema type for the tool's arguments.
  * @typeParam O - The Zod schema type for the tool's structured output, if declared.
  */
-export interface ToolDefinition<I extends z.ZodType = z.ZodType, O extends z.ZodType = z.ZodType> {
+export interface ToolDefinition<
+  // `tools` is an ARRAY of this type, and TS does not infer a generic per array
+  // element — an entry written inline gets these DEFAULTS, so `z.infer<I>` is
+  // `unknown` and the handler will not compile.
+  //
+  // That is the intended outcome. Zod 3's `ZodTypeAny` made the default `any`,
+  // which is why handler arguments compiled for years without ever being
+  // checked. Defaulting to `unknown` means a definition that skips {@link tool}
+  // fails immediately and visibly, rather than silently opting out of typing —
+  // and `tool()` is a one-word fix at the definition site.
+  I extends z.ZodType = z.ZodType,
+  O extends z.ZodType = z.ZodType,
+> {
   /** A short snake_case identifier, unique within the server. */
   name: string;
   /** A human-readable display name for client tool pickers (MCP `title`). */
@@ -362,7 +382,15 @@ export interface ToolDefinition<I extends z.ZodType = z.ZodType, O extends z.Zod
   /** Marks the tool as mutating, which forces client consent. Defaults to `false`. */
   mutating?: boolean;
   /** The async handler — receives validated args and the {@link ToolContext}. */
-  handler(args: z.infer<I>, ctx: ToolContext): Promise<ToolResult | string>;
+  /**
+   * The tool's implementation.
+   *
+   * `NoInfer` on the return side is load-bearing: without it `O` would also be
+   * inferred FROM the returned `structured`, so the schema and the value would
+   * agree by construction and check nothing. Pinning `O` to the declared
+   * `output` alone is what makes the comparison real.
+   */
+  handler(args: z.infer<I>, ctx: ToolContext): Promise<ToolResult<NoInfer<z.infer<O>>> | string>;
 }
 
 /**

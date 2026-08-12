@@ -167,9 +167,17 @@ export interface SourceSyncResult {
   /** The documents fetched this run, mapping 1:1 onto `IngestDocumentInput`. */
   documents: SourceDocument[];
   /**
-   * The watermark to advance the feed's cursor to. Omit (or return `{ type: 'none' }`)
-   * to leave the cursor unchanged. The cloud only advances if the new value is
-   * monotonically ahead (compare-and-swap).
+   * The watermark to advance the feed's cursor to. Omit (or return
+   * `{ type: 'none' }`) to leave the cursor unchanged — the two are synonyms,
+   * and the platform now genuinely treats them as such.
+   *
+   * The old wording here claimed "the cloud only advances if the new value is
+   * monotonically ahead (compare-and-swap)". Half of that was wrong and worth
+   * correcting rather than deleting: there IS a compare-and-swap, but it is
+   * against the cursor the round STARTED from — it stops two concurrent syncs
+   * clobbering each other. Nothing compares watermark values for ordering.
+   * Returning an older date than the stored one moves the feed backwards, and
+   * this is the layer that decides what to return.
    */
   cursor?: Watermark;
 }

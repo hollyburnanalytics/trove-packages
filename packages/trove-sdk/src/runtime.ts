@@ -69,7 +69,23 @@ export interface RunOptions<C = Record<string, unknown>> {
 export interface RunResult {
   /** The validated, deduped documents `sync` returned. */
   documents: SourceDocument[];
-  /** The cursor `sync` returned, or `{ type: 'none' }` if it returned none. */
+  /**
+   * The cursor `sync` returned, or `{ type: 'none' }` if it returned none.
+   *
+   * **`{type:'none'}` here is not a position, and must never be written to a
+   * feed's cursor as if it were.** It is the normalized form of "the source
+   * gave no new position", which is why an omitted cursor and an explicit
+   * `{type:'none'}` arrive here identically — the distinction between them is
+   * deliberately erased, because they mean the same thing to an author.
+   *
+   * That erasure is safe only as long as every consumer treats the value as
+   * advisory rather than as a cursor to store. A host that stringifies this
+   * straight into a feed's watermark replaces a real position with a blank
+   * one, and no watermark strategy re-offers what is behind it — so the feed
+   * does not restart, it skips forward permanently, quietly, on a run that
+   * looks clean. Trove's platform makes that decision in one predicate
+   * (`isAdvancingWatermark`); a host embedding this runtime needs its own.
+   */
   cursor: Watermark;
   /** Captured `ctx.log(...)` lines (when no custom `logSink` was supplied). */
   logs: unknown[][];

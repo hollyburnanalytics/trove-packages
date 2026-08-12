@@ -1,4 +1,4 @@
-import type { TroveSource } from '@ontrove/sdk';
+import type { SourceDocument, TroveSource } from '@ontrove/sdk';
 import { defineSource } from '@ontrove/sdk';
 import { afterAll, describe, expect, it } from 'vitest';
 import {
@@ -96,7 +96,12 @@ describe('toWireDocument', () => {
   });
 
   it('refuses an untitled document, naming it', () => {
-    expect(() => toWireDocument({ id: 'a', text: 'body' })).toThrow(/document "a" has no title/);
+    // `title` is required by the type now, so the missing-title case has to be
+    // constructed deliberately — which is the point: an author cannot reach
+    // this at all without casting past the contract.
+    expect(() => toWireDocument({ id: 'a', text: 'body' } as unknown as SourceDocument)).toThrow(
+      /document "a" has no title/,
+    );
     expect(() => toWireDocument({ id: 'b', title: '', text: 'body' })).toThrow(/has no title/);
   });
 });

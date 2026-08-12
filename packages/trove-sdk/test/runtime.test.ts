@@ -11,7 +11,7 @@ describe('runSource — success', () => {
         return {
           documents: [
             { id: 'a', title: 'A', text: 'alpha' },
-            { id: 'b', text: 'beta', audioUrl: 'https://x/audio.mp3' },
+            { id: 'b', title: 'Doc b', text: 'beta', audioUrl: 'https://x/audio.mp3' },
           ],
           cursor: { type: 'date', value: '2026-06-14T00:00:00Z' } satisfies Watermark,
         };
@@ -28,7 +28,7 @@ describe('runSource — success', () => {
   it('accepts a bare array and defaults the cursor to none', async () => {
     const source = defineSource({
       async sync() {
-        return [{ id: 'a', text: 'alpha' }];
+        return [{ id: 'a', title: 'Doc a', text: 'alpha' }];
       },
     });
     const result = await runSource(source);
@@ -39,7 +39,7 @@ describe('runSource — success', () => {
   it('accepts an audio-only document (no text)', async () => {
     const source = defineSource({
       async sync() {
-        return [{ id: 'ep1', audioUrl: 'https://x/ep1.mp3', author: 'Show' }];
+        return [{ id: 'ep1', title: 'Audio ep1', audioUrl: 'https://x/ep1.mp3', author: 'Show' }];
       },
     });
     const result = await runSource(source);
@@ -58,7 +58,7 @@ describe('runSource — success', () => {
         await ctx.fetch('https://example.com');
         ctx.log('logged');
         expect(ctx.now()).toEqual(fixedNow);
-        return [{ id: ctx.config.q, text: 'x' }];
+        return [{ title: 'Fixture', id: ctx.config.q, text: 'x' }];
       },
     });
 
@@ -86,7 +86,7 @@ describe('runSource — success', () => {
       const source = defineSource({
         async sync(ctx) {
           await ctx.fetch('https://example.com');
-          return [{ id: 'a', text: 'x' }];
+          return [{ id: 'a', title: 'Doc a', text: 'x' }];
         },
       });
       await runSource(source);
@@ -99,7 +99,7 @@ describe('runSource — success', () => {
   it('uses a real Date from the default clock when none is injected', async () => {
     const source = defineSource({
       async sync(ctx) {
-        return [{ id: 'a', text: String(ctx.now() instanceof Date) }];
+        return [{ id: 'a', title: 'Doc a', text: String(ctx.now() instanceof Date) }];
       },
     });
     const result = await runSource(source);
@@ -112,9 +112,9 @@ describe('runSource — dedup', () => {
     const source = defineSource({
       async sync() {
         return [
-          { id: 'a', text: 'first' },
-          { id: 'b', text: 'beta' },
-          { id: 'a', text: 'second-should-drop' },
+          { id: 'a', title: 'Doc a', text: 'first' },
+          { id: 'b', title: 'Doc b', text: 'beta' },
+          { id: 'a', title: 'Doc a', text: 'second-should-drop' },
         ];
       },
     });
@@ -138,7 +138,7 @@ describe('runSource — validation errors', () => {
   it('throws when neither text nor audioUrl is present', async () => {
     const source = defineSource({
       async sync() {
-        return [{ id: 'a' } as SourceDocument];
+        return [{ title: 'Fixture', id: 'a' } as SourceDocument];
       },
     });
     await expect(runSource(source)).rejects.toThrow(/must provide `text` or `audioUrl`/);
@@ -147,7 +147,9 @@ describe('runSource — validation errors', () => {
   it('throws on an invalid contentType', async () => {
     const source = defineSource({
       async sync() {
-        return [{ id: 'a', text: 'x', contentType: 'nope' } as unknown as SourceDocument];
+        return [
+          { id: 'a', title: 'Doc a', text: 'x', contentType: 'nope' } as unknown as SourceDocument,
+        ];
       },
     });
     await expect(runSource(source)).rejects.toThrow(/invalid contentType/);
@@ -188,7 +190,7 @@ describe('runSource — cursor passthrough', () => {
       async sync(ctx) {
         expect(ctx.cursor).toEqual(input);
         return {
-          documents: [{ id: 'a', text: 'x' }],
+          documents: [{ id: 'a', title: 'Doc a', text: 'x' }],
           cursor: { type: 'date', value: '2026-06-14T00:00:00Z' } as Watermark,
         };
       },
@@ -201,7 +203,7 @@ describe('runSource — cursor passthrough', () => {
     const source = defineSource({
       async sync(ctx) {
         expect(ctx.cursor).toEqual({ type: 'none' });
-        return [{ id: 'a', text: 'x' }];
+        return [{ id: 'a', title: 'Doc a', text: 'x' }];
       },
     });
     await runSource(source);

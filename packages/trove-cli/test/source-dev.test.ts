@@ -86,7 +86,7 @@ describe('source dev', () => {
     const code = await sourceDev.dev(ctx, parseArgs([dir]), loaderFor(source));
     expect(code).toBe(ExitCode.Success);
     const docs = JSON.parse(writer.stdoutText());
-    expect(docs.map((d: { id: string }) => d.id)).toEqual(['1', '2']);
+    expect(docs.map((d: { title: 'Fixture'; id: string }) => d.id)).toEqual(['1', '2']);
     expect(mock.calls.length).toBe(0); // no upload
   });
 
@@ -101,7 +101,10 @@ describe('source dev', () => {
     });
     const cur = defineSource({
       async sync() {
-        return { documents: [{ id: 'a', text: 'x' }], cursor: { type: 'date', value: 'd' } };
+        return {
+          documents: [{ title: 'Fixture', id: 'a', text: 'x' }],
+          cursor: { type: 'date', value: 'd' },
+        };
       },
     });
     await sourceDev.dev(ctx, parseArgs([dir]), loaderFor(cur));
@@ -135,7 +138,7 @@ describe('source dev', () => {
       async sync(ctx) {
         seenConfig = ctx.config as Record<string, unknown>;
         seenCursor = ctx.cursor;
-        return [{ id: 'a', text: 'b' }];
+        return [{ title: 'Fixture', id: 'a', text: 'b' }];
       },
     });
     const mock = mockFetch({});
@@ -214,7 +217,7 @@ describe('source validate', () => {
   it('passes a valid manifest', async () => {
     writeFileSync(
       join(dir, 'manifest.json'),
-      JSON.stringify({ id: 'ok', name: 'OK', version: '1.0.0' }),
+      JSON.stringify({ title: 'Fixture', id: 'ok', name: 'OK', version: '1.0.0' }),
     );
     const ctx = buildContext({
       globals: { json: true },
@@ -230,7 +233,13 @@ describe('source validate', () => {
   it('fails a manifest with a credential-shaped config key (human)', async () => {
     writeFileSync(
       join(dir, 'manifest.json'),
-      JSON.stringify({ id: 'bad', name: 'Bad', version: '1.0.0', config: { apiKey: {} } }),
+      JSON.stringify({
+        title: 'Fixture',
+        id: 'bad',
+        name: 'Bad',
+        version: '1.0.0',
+        config: { apiKey: {} },
+      }),
     );
     const ctx = buildContext({ globals: {}, writer, isTTY: true, configEnv: { home: dir } });
     const code = await sourceDev.validate(ctx, parseArgs([dir]));
@@ -270,7 +279,7 @@ describe('source test', () => {
       async sync(ctx) {
         const res = await ctx.fetch('https://feed');
         const body = await res.text();
-        return [{ id: '1', text: body }];
+        return [{ title: 'Fixture', id: '1', text: body }];
       },
     });
     const ctx = buildContext({
@@ -292,7 +301,15 @@ describe('source test', () => {
   it('reports problems for malformed documents (human, exit 2)', async () => {
     const source = defineSource({
       async sync() {
-        return { documents: [{ id: 'only-id' } as unknown as { id: string; text: string }] };
+        return {
+          documents: [
+            { title: 'Fixture', id: 'only-id' } as unknown as {
+              title: 'Fixture';
+              id: string;
+              text: string;
+            },
+          ],
+        };
       },
     });
     const ctx = buildContext({
@@ -330,7 +347,7 @@ describe('source test', () => {
     const source = defineSource({
       async sync(ctx) {
         const res = await ctx.fetch('https://feed');
-        return [{ id: '1', text: await res.text() }];
+        return [{ title: 'Fixture', id: '1', text: await res.text() }];
       },
     });
     const ctx = buildContext({
@@ -353,7 +370,7 @@ describe('source test', () => {
     writeFileSync(join(dir, 'fixtures.json'), '[1]');
     const source = defineSource({
       async sync() {
-        return [{ id: '1', text: 'x' }];
+        return [{ title: 'Fixture', id: '1', text: 'x' }];
       },
     });
     const ctx = buildContext({
@@ -376,7 +393,7 @@ describe('source test', () => {
     writeFileSync(join(dir, 'fixtures.json'), '{ broken');
     const source = defineSource({
       async sync() {
-        return [{ id: '1', text: 'x' }];
+        return [{ title: 'Fixture', id: '1', text: 'x' }];
       },
     });
     const ctx = buildContext({
@@ -400,7 +417,7 @@ describe('source test', () => {
     const source = defineSource({
       async sync(ctx) {
         const res = await ctx.fetch('https://unknown');
-        return [{ id: '1', text: `status:${String(res.status)}` }];
+        return [{ title: 'Fixture', id: '1', text: `status:${String(res.status)}` }];
       },
     });
     const ctx = buildContext({
@@ -421,7 +438,15 @@ describe('source test', () => {
   it('flags a document with no id', async () => {
     const source = defineSource({
       async sync() {
-        return { documents: [{ id: '', text: 'x' } as unknown as { id: string; text: string }] };
+        return {
+          documents: [
+            { title: 'Fixture', id: '', text: 'x' } as unknown as {
+              title: 'Fixture';
+              id: string;
+              text: string;
+            },
+          ],
+        };
       },
     });
     const ctx = buildContext({
@@ -440,7 +465,7 @@ describe('source test', () => {
     rmSync(join(dir, 'index.ts'));
     writeFileSync(
       join(dir, 'manifest.json'),
-      JSON.stringify({ id: 'BAD UPPER', name: 'x', version: 'nope' }),
+      JSON.stringify({ title: 'Fixture', id: 'BAD UPPER', name: 'x', version: 'nope' }),
     );
     const ctx = buildContext({
       globals: { json: true },
@@ -462,7 +487,7 @@ describe('source sync', () => {
     writer = captureWriter();
     writeFileSync(
       join(dir, 'manifest.json'),
-      JSON.stringify({ id: 'my-blog', name: 'My Blog', version: '1.0.0' }),
+      JSON.stringify({ title: 'Fixture', id: 'my-blog', name: 'My Blog', version: '1.0.0' }),
     );
     writeFileSync(join(dir, 'index.ts'), '// source');
   });
@@ -480,13 +505,21 @@ describe('source sync', () => {
   it('runs locally then ingests with cursor CAS against an existing source', async () => {
     const mock = mockFetch((req: CapturedRequest) => {
       if (req.operationName === 'CliSources') {
-        return { data: { sources: [{ id: 'c_1', name: 'My Blog' }] } };
+        return { data: { sources: [{ title: 'Fixture', id: 'c_1', name: 'My Blog' }] } };
       }
       if (req.operationName === 'CliSourceFeeds') {
         return {
           data: {
             source: {
-              feeds: [{ id: 's_1', name: 'default', externalKey: 'default', cursor: null }],
+              feeds: [
+                {
+                  title: 'Fixture',
+                  id: 's_1',
+                  name: 'default',
+                  externalKey: 'default',
+                  cursor: null,
+                },
+              ],
             },
           },
         };
@@ -521,7 +554,7 @@ describe('source sync', () => {
   it('passes cursorBefore when the feed already has a cursor', async () => {
     const mock = mockFetch((req: CapturedRequest) => {
       if (req.operationName === 'CliSources') {
-        return { data: { sources: [{ id: 'c_1', name: 'My Blog' }] } };
+        return { data: { sources: [{ title: 'Fixture', id: 'c_1', name: 'My Blog' }] } };
       }
       if (req.operationName === 'CliSourceFeeds') {
         return {
@@ -561,7 +594,7 @@ describe('source sync', () => {
     const mock = mockFetch((req: CapturedRequest) => {
       if (req.operationName === 'CliSources') return { data: { sources: [] } };
       if (req.operationName === 'CliCreateSource') {
-        return { data: { createSource: { id: 'c_new' } } };
+        return { data: { createSource: { title: 'Fixture', id: 'c_new' } } };
       }
       if (req.operationName === 'CliSourceFeeds') {
         return { data: { source: { feeds: [] } } };
@@ -569,7 +602,13 @@ describe('source sync', () => {
       if (req.operationName === 'CliAddFeed') {
         return {
           data: {
-            addFeed: { id: 'f_new', name: 'default', externalKey: 'default', cursor: null },
+            addFeed: {
+              title: 'Fixture',
+              id: 'f_new',
+              name: 'default',
+              externalKey: 'default',
+              cursor: null,
+            },
           },
         };
       }
@@ -605,7 +644,10 @@ describe('source sync', () => {
   });
 
   it('errors when neither --source nor a manifest name is available', async () => {
-    writeFileSync(join(dir, 'manifest.json'), JSON.stringify({ id: 'x', version: '1.0.0' }));
+    writeFileSync(
+      join(dir, 'manifest.json'),
+      JSON.stringify({ title: 'Fixture', id: 'x', version: '1.0.0' }),
+    );
     const mock = mockFetch({ data: { sources: [] } });
     const ctx = ctxFor(mock, writer, dir);
     await expect(
@@ -617,18 +659,26 @@ describe('source sync', () => {
     const noisy = defineSource({
       async sync(ctx) {
         ctx.log('working');
-        return [{ id: 'd1', text: 'b' }];
+        return [{ title: 'Fixture', id: 'd1', text: 'b' }];
       },
     });
     const mock = mockFetch((req: CapturedRequest) => {
       if (req.operationName === 'CliSources') {
-        return { data: { sources: [{ id: 'c_1', name: 'My Blog' }] } };
+        return { data: { sources: [{ title: 'Fixture', id: 'c_1', name: 'My Blog' }] } };
       }
       if (req.operationName === 'CliSourceFeeds') {
         return {
           data: {
             source: {
-              feeds: [{ id: 's_1', name: 'default', externalKey: 'default', cursor: null }],
+              feeds: [
+                {
+                  title: 'Fixture',
+                  id: 's_1',
+                  name: 'default',
+                  externalKey: 'default',
+                  cursor: null,
+                },
+              ],
             },
           },
         };
@@ -659,13 +709,21 @@ describe('source sync', () => {
   it('matches a source by id (c_…) directly', async () => {
     const mock = mockFetch((req: CapturedRequest) => {
       if (req.operationName === 'CliSources') {
-        return { data: { sources: [{ id: 'c_99', name: 'Other' }] } };
+        return { data: { sources: [{ title: 'Fixture', id: 'c_99', name: 'Other' }] } };
       }
       if (req.operationName === 'CliSourceFeeds') {
         return {
           data: {
             source: {
-              feeds: [{ id: 's_1', name: 'default', externalKey: 'default', cursor: null }],
+              feeds: [
+                {
+                  title: 'Fixture',
+                  id: 's_1',
+                  name: 'default',
+                  externalKey: 'default',
+                  cursor: null,
+                },
+              ],
             },
           },
         };
@@ -695,7 +753,7 @@ describe('source sync', () => {
   it('errors when the feed is absent and --create is not given', async () => {
     const mock = mockFetch((req: CapturedRequest) => {
       if (req.operationName === 'CliSources') {
-        return { data: { sources: [{ id: 'c_1', name: 'My Blog' }] } };
+        return { data: { sources: [{ title: 'Fixture', id: 'c_1', name: 'My Blog' }] } };
       }
       return { data: { source: { feeds: [] } } };
     });
@@ -708,13 +766,21 @@ describe('source sync', () => {
   it('renders the ingest result as a human record', async () => {
     const mock = mockFetch((req: CapturedRequest) => {
       if (req.operationName === 'CliSources') {
-        return { data: { sources: [{ id: 'c_1', name: 'My Blog' }] } };
+        return { data: { sources: [{ title: 'Fixture', id: 'c_1', name: 'My Blog' }] } };
       }
       if (req.operationName === 'CliSourceFeeds') {
         return {
           data: {
             source: {
-              feeds: [{ id: 's_1', name: 'default', externalKey: 'default', cursor: null }],
+              feeds: [
+                {
+                  title: 'Fixture',
+                  id: 's_1',
+                  name: 'default',
+                  externalKey: 'default',
+                  cursor: null,
+                },
+              ],
             },
           },
         };
@@ -857,7 +923,7 @@ describe('source deploy', () => {
   });
 
   it('requires a slug when the manifest has no id', async () => {
-    writeManifest({ id: undefined });
+    writeManifest({ title: 'Fixture', id: undefined });
     const mock = mockFetch(deployResponse('LIVE'));
     await expect(
       sourceDev.deploy(ctxFor(mock, writer, dir), parseArgs([dir], { value: ['slug'] }), {}),

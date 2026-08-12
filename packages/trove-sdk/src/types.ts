@@ -52,8 +52,16 @@ export interface SourceDocument {
    * runs.
    */
   id: string;
-  /** Document title. Maps to `IngestDocumentInput.title`. */
-  title?: string;
+  /**
+   * Document title. Maps to `IngestDocumentInput.title`.
+   *
+   * REQUIRED, because every path that ingests one requires it — a titleless
+   * document is refused at the seam with "has no title". Optional here until
+   * the two were lined up, which meant the type accepted something the
+   * platform would always reject, and you found out at run time on a schedule
+   * rather than at your desk.
+   */
+  title: string;
   /**
    * Full plain-text content. Maps to `IngestDocumentInput.text`. Strip HTML/markup
    * for best search quality. Required unless `audioUrl` is set.
@@ -66,6 +74,27 @@ export interface SourceDocument {
    * `text`.
    */
   audioUrl?: string;
+  /**
+   * URL to a file Trove should fetch and extract — a PDF, an EPUB, a document.
+   * The platform downloads it, retains the artifact, and derives the text.
+   *
+   * Use instead of `text` when the upstream's real content is a file rather
+   * than a string. Pair with {@link mimeType} when the URL does not reveal the
+   * type.
+   */
+  fileUrl?: string;
+  /**
+   * The MIME type of {@link fileUrl}, when the URL alone does not say.
+   * Ignored without one.
+   */
+  mimeType?: string;
+  /**
+   * Retain the artifact WITHOUT transcribing or extracting it.
+   *
+   * For an explicit "save this, do not spend on processing it" — the platform
+   * keeps the file and the metadata, and no speech-to-text or extraction runs.
+   */
+  captureOnly?: boolean;
   /** Canonical link back to the original. Maps to `IngestDocumentInput.url`. */
   url?: string;
   /**

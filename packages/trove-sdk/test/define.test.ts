@@ -29,7 +29,7 @@ describe('defineSource — authoring validation', () => {
   it('preserves typed config inference', async () => {
     const source = defineSource<{ feedUrl: string }>({
       async sync(ctx) {
-        return [{ id: ctx.config.feedUrl, text: 'x' }];
+        return [{ id: ctx.config.feedUrl, title: 'Typed', text: 'x' }];
       },
     });
     expect(typeof source.sync).toBe('function');
@@ -38,7 +38,7 @@ describe('defineSource — authoring validation', () => {
 
 describe('defineSync — single-function convenience', () => {
   it('wraps a bare sync function into a source', () => {
-    const source = defineSync(async () => [{ id: 'a', text: 'hello' }]);
+    const source = defineSync(async () => [{ id: 'a', title: 'Doc a', text: 'hello' }]);
     expect(typeof source.sync).toBe('function');
   });
 });

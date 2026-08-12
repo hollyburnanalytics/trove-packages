@@ -68,6 +68,10 @@ export interface WireDocument {
   text?: string;
   /** An audio enclosure Trove downloads and transcribes into the body. */
   audio_url?: string;
+  file_url?: string;
+  mime_type?: string;
+  capture_only?: boolean;
+  content_type?: string;
   /** The canonical link back to the original. */
   url?: string;
   /** The author (for podcasts, the show name). */
@@ -187,11 +191,18 @@ export function toWireDocument(doc: SourceDocument): WireDocument {
     title: doc.title,
     ...(doc.text !== undefined && { text: doc.text }),
     ...(doc.audioUrl !== undefined && { audio_url: doc.audioUrl }),
+    ...(doc.fileUrl !== undefined && { file_url: doc.fileUrl }),
+    ...(doc.mimeType !== undefined && { mime_type: doc.mimeType }),
+    ...(doc.captureOnly !== undefined && { capture_only: doc.captureOnly }),
     ...(doc.url !== undefined && { url: doc.url }),
     ...(doc.author !== undefined && { author: doc.author }),
     ...(doc.date !== undefined && { date: doc.date }),
     ...(doc.tags !== undefined && { tags: doc.tags }),
     ...(doc.metadata !== undefined && { metadata: doc.metadata }),
+    // Carried, not dropped. This field survived the LOCAL path and vanished on
+    // the deployed one, so the same source quietly indexed bookmarks as plain
+    // text once it was deployed.
+    ...(doc.contentType !== undefined && { content_type: doc.contentType }),
   };
 }
 

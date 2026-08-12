@@ -29,8 +29,8 @@ describe('toIngestInput', () => {
   });
 
   it('omits undefined fields and supports audioUrl', () => {
-    const out = toIngestInput({ id: 'a', audioUrl: 'https://a.mp3' });
-    expect(out).toEqual({ externalId: 'a', audioUrl: 'https://a.mp3' });
+    const out = toIngestInput({ title: 'Fixture', id: 'a', audioUrl: 'https://a.mp3' });
+    expect(out).toEqual({ externalId: 'a', title: 'Fixture', audioUrl: 'https://a.mp3' });
   });
 });
 

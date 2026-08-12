@@ -19,6 +19,12 @@ export interface IngestDocumentInput {
   text?: string;
   /** URL to an audio file (triggers transcription). */
   audioUrl?: string;
+  /** A file for Trove to fetch and extract — a PDF, an EPUB, a document. */
+  fileUrl?: string;
+  /** The MIME type of {@link fileUrl}, when the URL alone does not say. */
+  mimeType?: string;
+  /** Retain the artifact without transcribing or extracting it. */
+  captureOnly?: boolean;
   /** Canonical link back to the original. */
   url?: string;
   /** Content author / podcast show name. */
@@ -46,6 +52,9 @@ export function toIngestInput(doc: SourceDocument): IngestDocumentInput {
   if (doc.title !== undefined) input.title = doc.title;
   if (doc.text !== undefined) input.text = doc.text;
   if (doc.audioUrl !== undefined) input.audioUrl = doc.audioUrl;
+  if (doc.fileUrl !== undefined) input.fileUrl = doc.fileUrl;
+  if (doc.mimeType !== undefined) input.mimeType = doc.mimeType;
+  if (doc.captureOnly !== undefined) input.captureOnly = doc.captureOnly;
   if (doc.url !== undefined) input.url = doc.url;
   if (doc.author !== undefined) input.author = doc.author;
   if (doc.date !== undefined) input.date = doc.date;

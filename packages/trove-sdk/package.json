@@ -1,7 +1,7 @@
 {
   "name": "@ontrove/sdk",
-  "version": "0.9.0",
-  "description": "Thin standard library for authoring Trove sources \u2014 defineSource, the sync(ctx) capability object, the document shape, the local-run harness, and manifest validation.",
+  "version": "0.10.0",
+  "description": "Thin standard library for authoring Trove sources — defineSource, the sync(ctx) capability object, the document shape, the local-run harness, and manifest validation.",
   "type": "module",
   "license": "MIT",
   "author": "Hollyburn Analytics Inc. <matt@hollyburnanalytics.com>",

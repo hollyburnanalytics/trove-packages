@@ -1,5 +1,49 @@
 # @ontrove/cli
 
+## 0.10.0
+
+### Minor Changes
+
+- The deployed shim stopped refusing what the SDK spine already has.
+
+  Two refusals, both correct when written and both outlived by the context spine.
+
+  `assertNoCredentials` turned away any invoke carrying a secret, on the grounds
+  that a source had no way to read one. `SourceContext` has had `secret(name)`
+  since the spine was named, so this was refusing sources that would work — and
+  telling their authors to go run them on a Mac. Credentials now reach the source
+  through `ctx.secret(name)`: a map goes in, and only a lookup by declared name
+  comes out, so a source cannot enumerate credentials it never asked for.
+
+  `deadlineMs` was documented as deliberately not surfaced, on the grounds that a
+  deadline would be a cloud-only capability. `ctx.deadline` is on the spine too.
+  It arrives as a duration and is exposed as an absolute instant, because the
+  runner computes the budget on a different machine.
+
+  `createSourceWorker` also now accepts a bare `sync` function as well as a
+  `defineSource` result, so an existing adapter does not need rewriting to become
+  deployable.
+
+- 37e59f6: Add `trove source deploy` — one command to put a source on Trove's own schedule.
+
+  Deploying a source previously meant bundling it by hand and calling a GraphQL
+  mutation from a browser console. `trove source deploy` now bundles `index.ts`
+  with a runtime shim that adapts the sandbox's request to your existing
+  `sync(ctx)` — nothing in a source is deployment-specific — and hands the result
+  to `deploySource`.
+
+  The rule that comes with the sandbox is refused locally, so you hear it while
+  the file is still open rather than hours later on a machine you cannot see:
+  `manifest.json` must declare `egress` — the hosts the source may reach, and its
+  entire reach. A deployment that does not go live exits non-zero and says why.
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies
+  - @ontrove/sdk@0.10.0
+  - @ontrove/mcp@0.10.0
+
 ## 0.9.0
 
 ### Minor Changes

@@ -1,5 +1,21 @@
 # @ontrove/mcp
 
+## 0.10.0
+
+### Minor Changes
+
+- A toolkit can have settings: `ctx.config`.
+
+  Sources have had typed, validated, user-editable settings for a long time.
+  Toolkits could hold a secret and nothing else, so a toolkit that wanted a home
+  airport or a company domain had to take it as an argument on every call — which
+  means the model guesses it, and the user cannot set it once.
+
+  `ctx.config` is the caller's stored values for this toolkit, frozen on the way
+  in: they are the user's settings, not scratch space, and a tool that mutates its
+  own settings mid-call confuses only itself. A toolkit that declares no `config`
+  block in its manifest sees `{}`.
+
 ## 0.9.0
 
 ### Minor Changes

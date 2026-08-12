@@ -1,5 +1,38 @@
 # @ontrove/sdk
 
+## 0.10.0
+
+### Minor Changes
+
+- Own the deployed-source invoke contract, and run it.
+
+  The contract every deployed source must obey is a JSON fixture, and it lived in
+  Trove's backend — which made it the backend's contract that other
+  implementations were welcome to read. Reading is not executing. Three programs
+  speak this contract and only one ran the cases; the third is the Mac runner,
+  which ships inside an installed app with no forced update, so a change it does
+  not catch reaches people as a silently broken sync on a build nobody can recall.
+
+  It lives here now, at `@ontrove/sdk/contract` (and as raw JSON at
+  `@ontrove/sdk/contract/source-invoke.json`, because the Mac's runner is plain
+  JavaScript). This package is the one artefact all three can reach.
+
+  Running it found three ways `createSourceWorker` did not speak the contract:
+
+  - An adapter that falls off the end of `sync` was answered with a 500. That is
+    an empty run, not a malformed one, and the bundled runtime has always accepted
+    it — so the same source worked bundled and broke deployed.
+  - `feedName`, `feedUrl` and `stats` were dropped. `SourceSyncResult` had nowhere
+    to put them, so a deployed source could not name its own feed, could not
+    report that the feed had moved, and could not ask the runner to drain again.
+    All three work when the same source runs on a Mac.
+  - A `cursor: null` was omitted rather than emitted — the fixture's fault, not
+    the worker's. Null and absent are the same statement, since the reader drops
+    null either way, so pinning the key set exactly made an implementation wrong
+    for being tidier.
+
+  `SourceSyncResult` gains `feedName`, `feedUrl` and `stats` accordingly.
+
 ## 0.9.0
 
 ### Minor Changes

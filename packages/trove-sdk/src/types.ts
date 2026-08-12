@@ -152,14 +152,86 @@ export interface SourceSyncResult {
 export type FetchLike = (url: string | URL, init?: RequestInit) => Promise<Response>;
 
 /**
- * The single argument to `sync` — a capability object: everything a source
- * reaches the outside world through is on `ctx`. There is no ambient authority.
+ * A log channel: callable for the common case, with levels when severity
+ * matters.
  *
- * `ctx.credentials` (Keychain-resolved auth material) and `ctx.browser` (a
- * Playwright browser for `needs_browser` sources) are **PROPOSED**, not part
- * of the shipped contract, and so are intentionally absent here.
+ * Callable and levelled at once because both already existed. Sources written
+ * against this SDK call `ctx.log(...)`; every adapter running in Trove's cloud
+ * calls `ctx.log.info(...)`. Supporting one meant rewriting the other set, for
+ * no gain to anybody — so the type admits both and the runtimes supply both.
  */
-export interface SourceContext<C = Record<string, unknown>> {
+export interface LogChannel {
+  (...args: unknown[]): void;
+  /** Ordinary progress. The default level for a bare `log(...)` call. */
+  info(...args: unknown[]): void;
+  /** Something surprising that did not stop the run. */
+  warn(...args: unknown[]): void;
+  /** Something that did stop it, or is about to. */
+  error(...args: unknown[]): void;
+}
+
+/**
+ * What EVERY extension is handed, whichever kind it is.
+ *
+ * This is the shared spine of the two contexts — a source's {@link
+ * SourceContext} and a toolkit's `ToolContext` in `@ontrove/mcp`. Both are this
+ * plus what only their kind needs, so the things an author uses constantly
+ * (a credential, a guarded fetch, a log line, the clock) are learned once and
+ * are identical on both sides.
+ *
+ * `@ontrove/mcp` does not import this type — it has no dependency on this
+ * package and should not gain one for a shape. Instead the convergence is
+ * asserted at the type level where both are already visible, so the two cannot
+ * drift apart without something going red.
+ *
+ * Everything here is a capability. There is no ambient authority: an extension
+ * reaches the outside world only through what it was handed.
+ */
+export interface ExtensionContext {
+  /**
+   * A credential the manifest declared, by name.
+   *
+   * Resolves whether the value was pasted by the user or is a token Trove
+   * refreshed a moment ago — the extension cannot tell, and must not need to.
+   * That is what keeps delegated authorization out of every author's code.
+   *
+   * Async because resolving may involve a vault read or a token refresh.
+   * Rejects when the name was never declared in the manifest, which is a
+   * programming error rather than a runtime condition.
+   */
+  secret(name: string): Promise<string>;
+  /**
+   * {@link secret}, but stating plainly that the extension cannot proceed
+   * without it. Behaves identically; the name is the documentation.
+   */
+  requireSecret(name: string): Promise<string>;
+  /**
+   * Behaves like the standard `fetch`, and is the ONLY way out.
+   *
+   * In Trove's cloud every request is routed through an egress worker that
+   * permits https alone, matches the manifest's declared hosts exactly, and
+   * refuses private and link-local addresses even when allowlisted. On the Mac
+   * it adds per-source timeouts, retry and rate-limit handling. Prefer it over
+   * global `fetch` everywhere: the global one is unguarded where it exists at
+   * all, and absent where it does not.
+   */
+  fetch: FetchLike;
+  /** Where an extension says what it is doing. Surfaced in the run transcript. */
+  log: LogChannel;
+  /**
+   * The current wall-clock time.
+   *
+   * Injected rather than read from a global so a run is deterministic under
+   * test, and so a replayed fixture means the same thing tomorrow.
+   */
+  now(): Date;
+}
+
+/**
+ * The single argument to `sync` — {@link ExtensionContext} plus what a
+ * scheduled, resumable, fan-out-capable source needs on top of it.
+ */
+export interface SourceContext<C = Record<string, unknown>> extends ExtensionContext {
   /**
    * The user's preference values, keyed by the field names declared in
    * `manifest.json` `config`. **Preferences only — never credentials.** Feed
@@ -174,21 +246,25 @@ export interface SourceContext<C = Record<string, unknown>> {
    */
   readonly cursor: Watermark;
   /**
-   * Behaves like the standard `fetch`. Prefer `ctx.fetch` over global `fetch` —
-   * in the Mac app it routes through per-source timeouts, retry, and
-   * rate-limit handling, surfacing failures in the source's error log.
+   * When this round must be finished, as epoch milliseconds.
+   *
+   * A sync is given a budget, not unlimited time — in the cloud because the
+   * isolate has a CPU ceiling, on the Mac because a user is waiting. A source
+   * that may run long should check this between units of work and return what
+   * it has, advancing the cursor honestly, rather than being cut off mid-item.
+   *
+   * `Infinity` where the host imposes no deadline.
    */
-  fetch: FetchLike;
+  readonly deadline: number;
   /**
-   * Structured log entry, surfaced in the Mac app's source logs and the
-   * `createSyncRun` audit record. Useful for reporting counts and progress.
+   * Report progress through a long run: how many items are done, and
+   * optionally a line for a person watching.
+   *
+   * A no-op where there is no channel back — a deployed source is one request
+   * and one response, with nowhere to send an update mid-flight. Call it
+   * anyway; a source should not have to know which host it is on.
    */
-  log(...args: unknown[]): void;
-  /**
-   * The current wall-clock time as a `Date`. Injected (rather than read from a
-   * global) so syncs are deterministic under test and the local-run harness.
-   */
-  now(): Date;
+  progress(done: number, message?: string): void;
 }
 
 /**

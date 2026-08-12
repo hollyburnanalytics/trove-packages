@@ -46,7 +46,9 @@ export {
   runSource,
 } from './runtime.js';
 export type {
+  ExtensionContext,
   FetchLike,
+  LogChannel,
   ManifestConfigField,
   SourceContentType,
   SourceContext,

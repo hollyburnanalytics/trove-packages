@@ -18,6 +18,7 @@
 
 import type {
   FetchLike,
+  LogChannel,
   SourceContext,
   SourceDocument,
   SourceSyncResult,
@@ -46,6 +47,18 @@ export interface RunOptions<C = Record<string, unknown>> {
   logSink?: (args: unknown[]) => void;
   /** The clock backing `ctx.now()`. Defaults to `() => new Date()`. */
   now?: () => Date;
+  /**
+   * Credentials to hand the source, keyed by the names its manifest declares.
+   *
+   * Absent in an ordinary local run, which is why `ctx.secret` rejects by name
+   * rather than returning undefined: a source that needs a key cannot proceed
+   * without one, and the name is what tells the developer which to supply.
+   */
+  secrets?: Readonly<Record<string, string>>;
+  /** When this run must finish, epoch ms. Omitted means no budget. */
+  deadline?: number;
+  /** Receives `ctx.progress(...)`. Omitted means the calls are dropped. */
+  onProgress?: (done: number, message?: string) => void;
 }
 
 /**
@@ -168,18 +181,49 @@ export async function runSource<C = Record<string, unknown>>(
     ((url: string | URL, init?: RequestInit): Promise<Response> => globalThis.fetch(url, init));
   const now = options.now ?? ((): Date => new Date());
 
+  // Callable AND levelled. Sources written against this SDK call `ctx.log(...)`;
+  // every adapter running in Trove's cloud calls `ctx.log.info(...)`. Building
+  // both here is what lets one module run under either runtime unchanged, which
+  // is the whole point of the shared context.
+  const emit = (args: unknown[]): void => {
+    if (options.logSink !== undefined) options.logSink(args);
+    else logs.push(args);
+  };
+  const log = ((...args: unknown[]) => {
+    emit(args);
+  }) as LogChannel;
+  log.info = (...args: unknown[]): void => {
+    emit(args);
+  };
+  log.warn = (...args: unknown[]): void => {
+    emit(args);
+  };
+  log.error = (...args: unknown[]): void => {
+    emit(args);
+  };
+
   const ctx: SourceContext<C> = {
     config: options.config ?? ({} as C),
     cursor,
     fetch: fetchImpl,
-    log: (...args: unknown[]) => {
-      if (options.logSink !== undefined) {
-        options.logSink(args);
-      } else {
-        logs.push(args);
-      }
-    },
+    log,
     now,
+    // A local run has no vault. Rejecting by NAME beats returning undefined:
+    // a source that asks for a credential it needs cannot continue, and
+    // "SEATS_AERO_API_KEY is not available here" is the only message that says
+    // what to do about it.
+    secret: (name: string): Promise<string> =>
+      options.secrets && name in options.secrets
+        ? Promise.resolve(options.secrets[name] as string)
+        : Promise.reject(
+            new Error(
+              `Secret "${name}" is not available in this run. Pass it via \`secrets\` to runSource, or set it on the source in Trove.`,
+            ),
+          ),
+    requireSecret: (name: string): Promise<string> => ctx.secret(name),
+    // No deadline locally: a developer watching their own sync is the budget.
+    deadline: options.deadline ?? Number.POSITIVE_INFINITY,
+    progress: options.onProgress ?? ((): void => {}),
   };
 
   const raw = await source.sync(ctx);

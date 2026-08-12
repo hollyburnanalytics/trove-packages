@@ -51,6 +51,11 @@ export interface CtxParams {
   fetchImpl: FetchLike;
   /** Sink for `ctx.log(...)` lines. */
   logSink: (args: unknown[]) => void;
+  /**
+   * The clock handed to `ctx.now()`. Injected so a tool is deterministic under
+   * test; defaults to the real one.
+   */
+  now?: () => Date;
   /** Optional declarative auth; when set, egress carries an auto-minted Bearer. */
   auth?: OAuth2ClientCredentials;
   /** Optional egress host allowlist (deny-by-default when non-empty). */
@@ -171,6 +176,35 @@ function makeTroveClient(p: CtxParams): TroveClient {
 }
 
 /**
+ * Build the callable-and-levelled log channel.
+ *
+ * Every level goes through the same redaction and the same sink; the level is
+ * for the reader, not a routing decision. Sharing one path is what guarantees a
+ * secret cannot escape through `warn` because only `log` was redacted.
+ *
+ * @param p - The context params carrying the sink and the known secrets.
+ * @returns The channel placed on `ctx.log`.
+ */
+function makeLog(p: Pick<CtxParams, 'logSink' | 'knownSecrets'>): ToolContext['log'] {
+  const emit = (args: unknown[]): void => {
+    p.logSink(redactSecrets(args, p.knownSecrets) as unknown[]);
+  };
+  const log = ((...args: unknown[]): void => {
+    emit(args);
+  }) as ToolContext['log'];
+  log.info = (...args: unknown[]): void => {
+    emit(args);
+  };
+  log.warn = (...args: unknown[]): void => {
+    emit(args);
+  };
+  log.error = (...args: unknown[]): void => {
+    emit(args);
+  };
+  return log;
+}
+
+/**
  * Build a {@link ToolContext} for a single tool invocation.
  *
  * @param p - The per-invocation context parameters.
@@ -187,6 +221,7 @@ export function buildCtx(p: CtxParams): ToolContext {
     fetch: ToolContext['fetch'];
     fetchJson: ToolContext['fetchJson'];
     log: ToolContext['log'];
+    now: ToolContext['now'];
     trove?: TroveClient;
   } = {
     userId: p.userId,
@@ -194,9 +229,8 @@ export function buildCtx(p: CtxParams): ToolContext {
     requireSecret,
     fetch,
     fetchJson: makeFetchJson(fetch),
-    log: (...args: unknown[]): void => {
-      p.logSink(redactSecrets(args, p.knownSecrets) as unknown[]);
-    },
+    log: makeLog(p),
+    now: p.now ?? ((): Date => new Date()),
   };
 
   if (p.troveEnabled) {

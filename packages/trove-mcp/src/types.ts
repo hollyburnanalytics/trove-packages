@@ -201,6 +201,25 @@ export interface TroveClient {
  * short-TTL `ctxToken`; the blast radius of a handler is exactly its declared
  * `secrets ∪ scopes ∪ egress`.
  */
+/**
+ * A log channel: callable for the common case, with levels when severity
+ * matters.
+ *
+ * Structurally identical to `LogChannel` in `@ontrove/sdk`, deliberately and
+ * without importing it — these packages share no dependency, and should not
+ * acquire one to agree on a shape. A type-level assertion in `@ontrove/cli`,
+ * which depends on both, is what stops them drifting.
+ */
+export interface LogChannel {
+  (...args: unknown[]): void;
+  /** Ordinary progress. The default level for a bare `log(...)` call. */
+  info(...args: unknown[]): void;
+  /** Something surprising that did not stop the call. */
+  warn(...args: unknown[]): void;
+  /** Something that did stop it. */
+  error(...args: unknown[]): void;
+}
+
 export interface ToolContext {
   /** The authenticated Clerk user id of the caller — identity, not a credential. */
   readonly userId: string;
@@ -248,8 +267,23 @@ export interface ToolContext {
    * the manifest `scopes` requested `trove:search` and/or `trove:ingest`.
    */
   readonly trove?: TroveClient;
-  /** Structured log entry, redacted against known secret values, surfaced in `trove logs`. */
-  log(...args: unknown[]): void;
+  /**
+   * Structured log entry, redacted against known secret values, surfaced in
+   * `trove logs`.
+   *
+   * Callable and levelled, matching a source's `ctx.log` in `@ontrove/sdk`. The
+   * two SDKs share a context spine and a caller should not have to remember
+   * which side they are on.
+   */
+  log: LogChannel;
+  /**
+   * The current wall-clock time.
+   *
+   * Injected rather than read from a global so a tool is deterministic under
+   * test — the same reason a source gets one. This was the last member of the
+   * shared spine a toolkit lacked.
+   */
+  now(): Date;
 }
 
 /**

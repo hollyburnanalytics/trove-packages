@@ -49,14 +49,17 @@ describe('the two SDKs share one context spine', () => {
     // callable, a `secret` that stops returning a promise — this stops
     // compiling, here, rather than surfacing as two SDKs that feel different.
     //
+    // The WHOLE spine, not a chosen subset. An earlier version of this test
+    // asserted only `secret`/`requireSecret`/`fetch`, and so failed to notice
+    // that a toolkit had no `now()` at all — the assertion agreed with the
+    // drift it existed to catch. A gate narrower than the thing it guards is
+    // worse than none, because it reads as coverage.
+    //
     // NOT asserted the other way round: a toolkit legitimately has members a
-    // source does not (`userId`, `trove`), and a source has members a toolkit
-    // does not (`cursor`, `deadline`, `progress`). The shared spine is a floor,
-    // not an equality.
-    const holds: Assignable<
-      ToolContext,
-      Pick<ExtensionContext, 'secret' | 'requireSecret' | 'fetch'>
-    > = true;
+    // source does not (`userId`, `trove`, `fetchJson`), and a source has
+    // members a toolkit does not (`cursor`, `deadline`, `progress`). The spine
+    // is a floor, not an equality.
+    const holds: Assignable<ToolContext, ExtensionContext> = true;
     expect(holds).toBe(true);
   });
 

@@ -40,7 +40,9 @@ describe('serializeCursor', () => {
     expect(serializeCursor({ type: 'date', value: '2026-01-01' })).toBe(
       JSON.stringify({ type: 'date', value: '2026-01-01' }),
     );
-    const idSet: Watermark = { type: 'idSet', values: ['1', '2'], max: '2' };
+    // `max` is the numeric cap on retained ids, not an id — see the Watermark
+    // wire contract in @ontrove/sdk.
+    const idSet: Watermark = { type: 'idSet', values: ['1', '2'], max: 2 };
     expect(serializeCursor(idSet)).toBe(JSON.stringify(idSet));
   });
 });

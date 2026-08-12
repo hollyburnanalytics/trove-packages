@@ -64,14 +64,14 @@ describe('runSource — success', () => {
 
     const result = await runSource(source, {
       config: { q: 'query-1' },
-      cursor: { type: 'idSet', values: ['5'], max: '5' },
+      cursor: { type: 'idSet', values: ['5'], max: 5 },
       fetchImpl,
       now: () => fixedNow,
       logSink: (args) => sink.push(args),
     });
 
     expect(fetchImpl).toHaveBeenCalledWith('https://example.com');
-    expect(seen?.cursor).toEqual({ type: 'idSet', values: ['5'], max: '5' });
+    expect(seen?.cursor).toEqual({ type: 'idSet', values: ['5'], max: 5 });
     expect(result.documents[0]?.id).toBe('query-1');
     // Custom sink captures logs; the returned logs array stays empty.
     expect(sink).toEqual([['logged']]);

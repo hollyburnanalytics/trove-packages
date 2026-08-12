@@ -101,15 +101,31 @@ export interface SourceDocument {
  *
  * - `date` — the feed is time-ordered and supports "since &lt;date&gt;"
  *   filtering (RSS, most APIs); the newest `value` you push becomes the next
- *   cursor.
- * - `idSet` — the feed has monotonic ids but no reliable date filter; advance
- *   to the highest id seen (`max`), optionally tracking a recent id set.
+ *   cursor. Set `inclusive` when the boundary item itself must be re-emitted
+ *   next run (a `>=` comparison) rather than skipped (the default strict `>`).
+ * - `idSet` — the feed has no reliable date filter, so resuming means
+ *   remembering which ids were already seen. `values` is that set (oldest
+ *   first) and `max` is the **cap on how many ids are retained** — a count, not
+ *   an id. Past the cap the oldest ids are evicted, which at worst re-fetches
+ *   those items once and lets `(feed, id)` dedup absorb them.
  * - `none` — re-fetch everything each run and rely purely on `(feed, id)`
  *   dedup. Always correct, just less efficient.
  */
 export type Watermark =
-  | { readonly type: 'date'; readonly value: string }
-  | { readonly type: 'idSet'; readonly values: readonly string[]; readonly max?: string }
+  // `idSet.max` was declared `string` here until it was reconciled against the
+  // two implementations that actually move this value, both of which say
+  // number: the writer bounds the set with `idSetWatermark(values, max)` and
+  // emits the numeric cap it applied, and Trove's reader projects the same
+  // field as the set's capacity (`values.length >= max` is what surfaces "this
+  // feed is now evicting"). Trove also hands its parsed cursor straight back as
+  // `ctx.cursor`, so this type is not just documentation of the wire value —
+  // it is the type of a value the platform constructs. A `string` here was a
+  // lie at that boundary, and a source that took the old type at its word and
+  // wrote `max: '10000'` would have had the field silently dropped, because the
+  // reader keeps `max` only when `typeof max === 'number'`.
+  // `date.inclusive` was likewise missing here while the writer emits it.
+  | { readonly type: 'date'; readonly value: string; readonly inclusive?: true }
+  | { readonly type: 'idSet'; readonly values: readonly string[]; readonly max?: number }
   | { readonly type: 'none' };
 
 /**

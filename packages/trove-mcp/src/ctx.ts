@@ -41,6 +41,8 @@ export type FetchLike = (input: string | URL, init?: RequestInit) => Promise<Res
 export interface CtxParams {
   /** The Clerk user id of the caller. */
   userId: string;
+  /** The caller's settings for this toolkit; `{}` when it declares none. */
+  config?: Readonly<Record<string, unknown>>;
   /** The short-TTL signed capability token. */
   ctxToken: string;
   /** The Trove-provided origin the callbacks POST to (no trailing slash required). */
@@ -222,9 +224,13 @@ export function buildCtx(p: CtxParams): ToolContext {
     fetchJson: ToolContext['fetchJson'];
     log: ToolContext['log'];
     now: ToolContext['now'];
+    config: ToolContext['config'];
     trove?: TroveClient;
   } = {
     userId: p.userId,
+    // Frozen so a tool cannot mutate its own settings and confuse itself
+    // mid-call: these are the user's stored values, not scratch space.
+    config: Object.freeze({ ...(p.config ?? {}) }),
     secret,
     requireSecret,
     fetch,

@@ -51,6 +51,13 @@ function toCall(body: unknown): McpToolCall | null {
     callbackBase: typeof b.callbackBase === 'string' ? b.callbackBase : '',
     userId: typeof b.userId === 'string' ? b.userId : '',
     scopes: Array.isArray(b.scopes) ? (b.scopes as string[]) : [],
+    // Absent for a toolkit that declares no settings, which is why this is `{}`
+    // rather than a rejection: the field's absence is the ordinary case, not a
+    // malformed call.
+    config:
+      b.config !== null && typeof b.config === 'object' && !Array.isArray(b.config)
+        ? (b.config as Record<string, unknown>)
+        : {},
   };
 }
 

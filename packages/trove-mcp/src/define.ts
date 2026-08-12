@@ -304,6 +304,7 @@ export function defineMcpServer(
     const knownSecrets = new Set<string>();
     const ctx = buildCtx({
       userId: call.userId,
+      ...(call.config !== undefined && { config: call.config }),
       ctxToken: call.ctxToken,
       callbackBase: call.callbackBase,
       troveEnabled: (call.scopes ?? []).some((s) => s === 'trove:search' || s === 'trove:ingest'),

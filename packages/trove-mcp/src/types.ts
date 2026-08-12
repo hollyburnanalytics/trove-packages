@@ -224,6 +224,20 @@ export interface ToolContext {
   /** The authenticated Clerk user id of the caller — identity, not a credential. */
   readonly userId: string;
   /**
+   * The user's settings for this toolkit, keyed by the field names its manifest
+   * declares in `config`.
+   *
+   * `{}` for a toolkit that declares no settings, or whose owner has not filled
+   * any in — the manifest's declared defaults are what apply. Preferences only,
+   * never credentials: a credential comes from {@link ToolContext.secret}, where
+   * it is encrypted at rest and redacted out of logs. Trove refuses a settings
+   * write that looks like a secret, so a toolkit should not go looking for one
+   * here.
+   *
+   * The same shape a source gets from `ctx.config` in `@ontrove/sdk`.
+   */
+  readonly config: Readonly<Record<string, unknown>>;
+  /**
    * Fetch one declared secret from the encrypted vault, decrypted only for
    * this invocation. `name` must appear in the manifest `secrets` array.
    * Throws a generic error if the secret is missing — prefer {@link requireSecret}
@@ -508,6 +522,13 @@ export interface ToolListEntry {
  * callbacks target; it is appended to the egress allowlist server-side.
  */
 export interface McpToolCall {
+  /**
+   * The caller's settings for this toolkit, as Trove read them from the
+   * tenant's own database. `{}` when the toolkit declares none — the control
+   * plane omits the field entirely in that case, so an unconfigurable toolkit
+   * costs no query and no bytes.
+   */
+  readonly config?: Readonly<Record<string, unknown>>;
   /** The (un-namespaced) tool name to invoke. */
   tool: string;
   /** The raw, unvalidated arguments object. */

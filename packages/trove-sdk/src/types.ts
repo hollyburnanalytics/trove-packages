@@ -180,6 +180,30 @@ export interface SourceSyncResult {
    * this is the layer that decides what to return.
    */
   cursor?: Watermark;
+  /**
+   * What the feed calls itself, when the source learned it this run.
+   *
+   * Trove adopts it, so a feed shows a name rather than the URL somebody
+   * pasted. Absent for a source that has nothing better to offer than what the
+   * user typed — never a guess.
+   */
+  feedName?: string;
+  /**
+   * Where the feed now lives, when it has permanently moved.
+   *
+   * A feed that 301s to a new address can say so once, instead of every future
+   * run paying for the redirect — and a feed that moves without saying so
+   * eventually stops resolving at all.
+   */
+  feedUrl?: string;
+  /**
+   * How much work this run did and how much is left.
+   *
+   * `remaining > 0` is what tells the runner to drain again rather than wait
+   * for the next scheduled tick, so a backfill finishes in one sitting instead
+   * of one page per interval.
+   */
+  stats?: { fetched?: number; remaining?: number };
 }
 
 /**

@@ -99,6 +99,16 @@ export interface SourceInvokeResult {
    * sending one would make the next sync re-fetch the feed from the beginning.
    */
   cursor?: Watermark;
+  /**
+   * What the run did and what is left. `remaining > 0` asks the runner to drain
+   * again rather than wait for the next scheduled tick, so a backfill finishes
+   * in one sitting instead of one page per interval.
+   */
+  stats?: { fetched?: number; remaining?: number };
+  /** What the feed calls itself, so it shows a name rather than a pasted URL. */
+  feedName?: string;
+  /** Where the feed permanently moved, so future runs stop paying the redirect. */
+  feedUrl?: string;
   /** The adapter's `ctx.log(...)` lines, buffered — there is no live channel. */
   logs: string[];
 }
@@ -234,6 +244,9 @@ export async function handleInvoke(
   return {
     documents: result.documents.map(toWireDocument),
     ...(result.cursor.type !== 'none' && { cursor: result.cursor }),
+    ...(result.stats === undefined ? {} : { stats: result.stats }),
+    ...(result.feedName === undefined ? {} : { feedName: result.feedName }),
+    ...(result.feedUrl === undefined ? {} : { feedUrl: result.feedUrl }),
     logs,
   };
 }

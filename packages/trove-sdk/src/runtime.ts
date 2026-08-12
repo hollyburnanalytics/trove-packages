@@ -91,6 +91,12 @@ export interface RunResult {
   logs: unknown[][];
   /** Count of documents dropped as duplicates of an earlier `id`. */
   duplicatesSkipped: number;
+  /** What the feed calls itself, when the source reported one. */
+  feedName?: string;
+  /** Where the feed permanently moved, when the source reported it. */
+  feedUrl?: string;
+  /** What the run did and what is left, when the source reported it. */
+  stats?: { fetched?: number; remaining?: number };
 }
 
 /**
@@ -133,14 +139,27 @@ function validateDocument(doc: SourceDocument, index: number): void {
  * @returns A normalized `{ documents, cursor? }` result.
  * @throws {Error} If the value is neither an array nor a `{ documents }` object.
  */
-function normalizeResult(value: SourceSyncResult | SourceDocument[]): SourceSyncResult {
+function normalizeResult(value: SourceSyncResult | SourceDocument[] | undefined): SourceSyncResult {
+  // An adapter whose only job is to no-op sometimes falls off the end of the
+  // function. That is an empty run, not a malformed one — refusing it breaks a
+  // working source over a style detail, and the deployed runtimes have always
+  // accepted it.
+  if (value === undefined || value === null) return { documents: [] };
   if (Array.isArray(value)) {
     return { documents: value };
   }
-  if (value !== null && typeof value === 'object' && Array.isArray(value.documents)) {
-    return value.cursor === undefined
-      ? { documents: value.documents }
-      : { documents: value.documents, cursor: value.cursor };
+  if (typeof value === 'object' && Array.isArray(value.documents)) {
+    return {
+      documents: value.documents,
+      ...(value.cursor === undefined ? {} : { cursor: value.cursor }),
+      // Carried, not dropped. Without these a deployed source cannot name its
+      // own feed, cannot report that the feed moved, and cannot ask the runner
+      // to drain again — three things the same source does fine when it runs on
+      // a Mac, and quietly loses by being deployed.
+      ...(value.feedName === undefined ? {} : { feedName: value.feedName }),
+      ...(value.feedUrl === undefined ? {} : { feedUrl: value.feedUrl }),
+      ...(value.stats === undefined ? {} : { stats: value.stats }),
+    };
   }
   throw new Error('sync must return an array of documents or an object with a `documents` array');
 }
@@ -253,5 +272,8 @@ export async function runSource<C = Record<string, unknown>>(
     cursor: result.cursor ?? { type: 'none' },
     logs,
     duplicatesSkipped,
+    ...(result.feedName === undefined ? {} : { feedName: result.feedName }),
+    ...(result.feedUrl === undefined ? {} : { feedUrl: result.feedUrl }),
+    ...(result.stats === undefined ? {} : { stats: result.stats }),
   };
 }

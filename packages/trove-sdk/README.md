@@ -136,7 +136,9 @@ same `id` is skipped.
 A `Watermark` describes how a feed resumes between syncs:
 
 - `{ type: 'date', value }` — time-ordered feeds with "since &lt;date&gt;" filtering (RSS, most APIs).
-- `{ type: 'idSet', values, max? }` — monotonic ids, no reliable date filter.
+- `{ type: 'idSet', values, max? }` — no reliable date filter, so resuming means
+  remembering which ids you have. `max` caps how many are retained; it is a
+  count, not an id.
 - `{ type: 'none' }` — re-fetch everything; rely on dedup. Always correct, less efficient.
 
 ## Local run harness

@@ -1,8 +1,9 @@
-import type { SourceDocument, TroveSource } from '@ontrove/sdk';
+import type { SourceDocument } from '@ontrove/sdk';
 import { defineSource } from '@ontrove/sdk';
 import { afterAll, describe, expect, it } from 'vitest';
 import {
   createSourceWorker,
+  type DeployableSource,
   handleInvoke,
   type SourceInvokeResult,
   toWatermark,
@@ -24,7 +25,7 @@ afterAll(() => {
 
 /** POST one invoke body at a worker and read its parsed response. */
 async function invoke(
-  source: TroveSource,
+  source: DeployableSource,
   body: unknown,
   path = 'https://invoke/sync',
 ): Promise<{ status: number; json: Record<string, unknown> }> {
@@ -171,16 +172,63 @@ describe('createSourceWorker', () => {
     expect(json).toEqual({ error: 'upstream is down', logs: ['starting'] });
   });
 
-  it('refuses an invoke that carries credentials it cannot deliver', async () => {
+  it('delivers a credential the runner resolved, by the name the manifest declares', async () => {
+    // This used to be a refusal, and the refusal was right when it was written:
+    // the spine had no credential channel. It grew `secret(name)` and this shim
+    // did not follow, so a working source was being turned away with a message
+    // telling its author to run it on a Mac.
     const source = defineSource({
-      async sync() {
+      async sync(ctx) {
+        const key = await ctx.secret('API_KEY');
+        return [{ id: 'a', title: key, text: 'body' }];
+      },
+    });
+    const { status, json } = await invoke(source, { credentials: { API_KEY: 'sk-1' } });
+    expect(status).toBe(200);
+    expect(json.documents).toEqual([{ id: 'a', title: 'sk-1', text: 'body' }]);
+  });
+
+  it('refuses by name a credential the source did not declare', async () => {
+    // The map goes in; only `secret(name)` comes out. A source cannot enumerate
+    // what it was handed, so asking for the wrong name fails loudly instead of
+    // reading another source's key out of the same bag.
+    const source = defineSource({
+      async sync(ctx) {
+        await ctx.secret('OTHER_TOKEN');
         return [];
       },
     });
     const { status, json } = await invoke(source, { credentials: { API_KEY: 'sk-1' } });
     expect(status).toBe(500);
-    expect(String(json.error)).toMatch(/API_KEY/);
-    expect(String(json.error)).toMatch(/no way to read them/);
+    expect(String(json.error)).toMatch(/OTHER_TOKEN/);
+  });
+
+  it('surfaces the budget as an absolute instant, not the duration it arrived as', async () => {
+    // The runner computes `deadlineMs` on its own machine. Sending an instant
+    // would hand the isolate a deadline from a clock it cannot check; sending a
+    // duration and adding it here keeps `ctx.deadline` the same epoch-ms shape a
+    // source reads on the Mac.
+    const before = Date.now();
+    let seen = 0;
+    const source = defineSource({
+      async sync(ctx) {
+        seen = ctx.deadline;
+        return [];
+      },
+    });
+    const { status } = await invoke(source, { deadlineMs: 45_000 });
+    expect(status).toBe(200);
+    expect(seen).toBeGreaterThanOrEqual(before + 45_000);
+  });
+
+  it('accepts a bare `sync` export, not only a defineSource result', async () => {
+    // Every adapter Trove bundles today exports `sync` directly. Accepting only
+    // `defineSource` would charge their authors a rewrite for the privilege of
+    // being deployable, and make "can this run in the cloud" depend on the year
+    // it was written.
+    const { status, json } = await invoke(async () => [{ id: 'a', title: 'A', text: 'body' }], {});
+    expect(status).toBe(200);
+    expect(json.documents).toEqual([{ id: 'a', title: 'A', text: 'body' }]);
   });
 
   it('reports a non-Error throw rather than losing it', async () => {

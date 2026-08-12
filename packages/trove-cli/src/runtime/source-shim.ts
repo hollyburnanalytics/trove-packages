@@ -38,7 +38,8 @@ export interface SourceInvokeBody {
   config?: Record<string, unknown>;
   /**
    * Plaintext secrets the runner resolved from the vault, `{}` when the source
-   * declares none. Refused rather than used: see {@link assertNoCredentials}.
+   * declares none. Reached through `ctx.secret(name)` — never as a bag the
+   * source can enumerate, so a source cannot read a credential it did not name.
    */
   credentials?: Record<string, string>;
   /**
@@ -47,10 +48,14 @@ export interface SourceInvokeBody {
    */
   cursor?: unknown;
   /**
-   * How long the isolate has. Not surfaced: `SourceContext` has no deadline
-   * field, so an SDK source has nowhere to read it and inventing one here would
-   * be a capability that only exists in the cloud, which is the one thing this
-   * shim is for avoiding.
+   * How long the isolate has, as a duration. Surfaced as `ctx.deadline`, an
+   * absolute epoch-ms instant — the spine's shape, so a source that paces
+   * itself does so identically here and on the Mac.
+   *
+   * A relative duration on the wire and an absolute instant in the context is
+   * deliberate: the wire value is computed by a runner on a different machine,
+   * and two clocks that disagree would hand the isolate a deadline already in
+   * the past.
    */
   deadlineMs?: number;
 }
@@ -122,28 +127,6 @@ function installRedirectPolicy(): void {
   if (redirectPolicyInstalled) return;
   globalThis.fetch = redirectFollowingFetch(globalThis.fetch.bind(globalThis));
   redirectPolicyInstalled = true;
-}
-
-/**
- * Refuse an invoke that carries secrets.
- *
- * `SourceContext` has no `credentials` channel — the SDK deliberately leaves it
- * out, and `ctx.config` is preferences-only, so smuggling secrets in there
- * would write them into the source's plaintext config. Dropping them silently
- * would be worse than either: the source would run, fail its upstream auth, and
- * report a 401 that points at the API rather than at the missing capability.
- *
- * @param credentials - The credentials the runner resolved.
- * @throws {Error} When any credential was supplied.
- */
-function assertNoCredentials(credentials: Record<string, string> | undefined): void {
-  const names = Object.keys(credentials ?? {});
-  if (names.length === 0) return;
-  throw new Error(
-    `this deployment was given credentials (${names.join(', ')}), but a source written against ` +
-      '@ontrove/sdk has no way to read them: sync(ctx) exposes preferences (ctx.config) and ' +
-      'nothing else. Deploy a source that needs no secrets, or run it from the Mac app.',
-  );
 }
 
 /**
@@ -220,11 +203,25 @@ export async function handleInvoke(
   body: SourceInvokeBody,
   logs: string[],
 ): Promise<SourceInvokeResult> {
-  assertNoCredentials(body.credentials);
-
   const result = await runSource(source, {
     config: body.config ?? {},
     cursor: toWatermark(body.cursor),
+    // Both of these used to be refusals. This shim was written when the SDK
+    // spine had neither, and it said so in two error messages — one telling an
+    // author with a credential to "run it from the Mac app", the other calling
+    // a deadline a cloud-only capability. The spine grew `secret(name)` and
+    // `deadline` and nobody came back, so the refusals outlived their reason
+    // and were turning working sources away.
+    //
+    // `secrets` is a map in and `ctx.secret(name)` out: a source asks for a
+    // credential by the name its manifest declares and cannot enumerate the
+    // rest, which is the property that lets a refreshed OAuth token look
+    // exactly like a pasted key to the code reading it.
+    ...(body.credentials !== undefined && { secrets: body.credentials }),
+    // Relative on the wire, absolute in the context. The runner computes the
+    // budget on its own machine, so sending an instant would hand the isolate a
+    // deadline from a clock it cannot check.
+    ...(body.deadlineMs !== undefined && { deadline: Date.now() + body.deadlineMs }),
     // The global fetch, so the adapter gets the redirect policy whether it
     // reaches the network through `ctx.fetch` or through a helper.
     fetchImpl: (url: string | URL, init?: RequestInit): Promise<Response> =>
@@ -242,12 +239,37 @@ export async function handleInvoke(
 }
 
 /**
+ * What a deployed module may default-export: a `defineSource(...)` result, or
+ * the bare `sync` function that Trove's own bundled adapters have always
+ * exported.
+ *
+ * Two shapes rather than one because the alternative was rewriting every
+ * existing adapter to become deployable, which is a migration charged to
+ * authors for a refactor's convenience. `defineSource` is what a new source
+ * should use — it is where manifest typing and future capability live — but a
+ * module that exports `sync` directly is not wrong, and refusing it would make
+ * "can this run in the cloud" depend on which year it was written.
+ */
+export type DeployableSource = TroveSource | TroveSource['sync'];
+
+/**
+ * Normalise either accepted shape to the one `runSource` takes.
+ *
+ * @param source - Whatever the deployed module default-exported.
+ * @returns A `TroveSource`.
+ */
+function asSource(source: DeployableSource): TroveSource {
+  return typeof source === 'function' ? { sync: source } : source;
+}
+
+/**
  * Wrap a source as the isolate's fetch handler.
  *
- * @param source - The author's `defineSource(...)` default export.
+ * @param source - The author's default export: a `defineSource(...)` result or a bare `sync`.
  * @returns The worker the deployed module default-exports.
  */
-export function createSourceWorker(source: TroveSource): SourceWorker {
+export function createSourceWorker(source: DeployableSource): SourceWorker {
+  const normalized = asSource(source);
   installRedirectPolicy();
 
   return {
@@ -259,7 +281,7 @@ export function createSourceWorker(source: TroveSource): SourceWorker {
       const logs: string[] = [];
       try {
         const body = (await request.json()) as SourceInvokeBody;
-        return Response.json(await handleInvoke(source, body, logs));
+        return Response.json(await handleInvoke(normalized, body, logs));
       } catch (err) {
         // A 500 carrying the message and the logs so far. An isolate that
         // swallowed its error and answered `{documents: []}` would read to the

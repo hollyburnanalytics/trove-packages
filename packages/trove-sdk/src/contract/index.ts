@@ -30,7 +30,10 @@
  * @module
  */
 
-import raw from './source-invoke.json';
+// The attribute is required, not decorative: Node's ESM loader refuses a JSON
+// module without it, so the compiled package throws on import in any plain-Node
+// consumer — which is every consumer that is not running through a bundler.
+import raw from './source-invoke.json' with { type: 'json' };
 
 /** A long string written compactly, so a 64 KB cursor fits in a readable file. */
 interface RepeatSpec {

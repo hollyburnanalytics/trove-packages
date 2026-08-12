@@ -1,5 +1,23 @@
 # @ontrove/sdk
 
+## 0.10.1
+
+### Patch Changes
+
+- Fix `@ontrove/sdk/contract` throwing on import outside a bundler.
+
+  `0.10.0` shipped the contract module with a bare JSON import. Node's ESM
+  loader refuses a JSON module without `with { type: 'json' }`, so the first
+  consumer to `import '@ontrove/sdk/contract'` got a TypeError rather than a
+  fixture. TypeScript compiled it, every test passed, and none of that could
+  see the failure — because the tests import from `src` through a bundler and
+  consumers do not.
+
+  A new suite runs plain `node` against the built `dist`, resolving through the
+  real `exports` map: the main entry, the contract subpath, and the raw JSON
+  path the Mac's runner reads off disk. Publishing is the one action here that
+  cannot be taken back, so it is worth a slow test.
+
 ## 0.10.0
 
 ### Minor Changes

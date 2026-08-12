@@ -1,5 +1,13 @@
 # @ontrove/cli
 
+## 0.10.1
+
+### Patch Changes
+
+- Updated dependencies
+  - @ontrove/sdk@0.10.1
+  - @ontrove/mcp@0.10.1
+
 ## 0.10.0
 
 ### Minor Changes

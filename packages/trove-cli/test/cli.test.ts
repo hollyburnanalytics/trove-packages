@@ -152,6 +152,7 @@ describe('dispatcher', () => {
       'source test',
       'source validate',
       'source sync',
+      'source deploy',
       'mcp init',
       'mcp dev',
       'mcp logs',

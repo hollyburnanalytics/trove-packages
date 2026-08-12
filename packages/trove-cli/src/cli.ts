@@ -69,6 +69,10 @@ const COMMANDS: Record<string, Command> = {
     spec: sourceDev.flagSpecs.sync,
     run: (ctx: CommandContext, a: ParsedArgs): Promise<number> => sourceDev.sync(ctx, a),
   },
+  'source deploy': {
+    spec: sourceDev.flagSpecs.deploy,
+    run: (ctx: CommandContext, a: ParsedArgs): Promise<number> => sourceDev.deploy(ctx, a),
+  },
   // capture
   save: { spec: capture.flagSpecs.save, run: capture.save },
   ingest: { spec: capture.flagSpecs.ingest, run: capture.ingest },
@@ -267,7 +271,7 @@ function usage(): string {
     'Auth:    login, logout, whoami',
     'Query:   search, discover, recent, get, list, sources, source, stats',
     'Capture: save, ingest',
-    'Source dev: source init|dev|test|validate|sync',
+    'Source dev: source init|dev|test|validate|sync|deploy',
     'MCP:     mcp ls|deploy|pause|resume|rollback|rm|init|dev|logs, secret set|ls   (deploy aliased at top level)',
     'Raw:     gql <file|->',
     '',

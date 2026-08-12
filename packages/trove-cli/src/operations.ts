@@ -313,6 +313,27 @@ export const DEPLOY_SERVER = /* GraphQL */ `
   }
 `;
 
+/**
+ * `mutation deploySource` — deploy a source package to run on Trove's own
+ * schedule. `status` and `error` are selected because a deployment that did not
+ * go LIVE has no sandbox serving it: it will never sync, and the caller has to
+ * hear that at the call site rather than infer it from documents that never
+ * arrive.
+ */
+export const DEPLOY_SOURCE = /* GraphQL */ `
+  mutation CliDeploySource($slug: String!, $manifest: JSON!) {
+    deploySource(slug: $slug, manifest: $manifest) {
+      id
+      sourceType
+      version
+      scriptName
+      status
+      sizeBytes
+      error
+    }
+  }
+`;
+
 /** `mutation setServerSecret` — seal a secret into the vault. */
 export const SET_SERVER_SECRET = /* GraphQL */ `
   mutation CliSetServerSecret($serverId: ID!, $name: String!, $value: String!) {

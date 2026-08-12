@@ -37,9 +37,9 @@
     "bun": ">=1.2.0"
   },
   "scripts": {
-    "prepack": "tsc -p tsconfig.build.json && node ../../scripts/build-mcp-worker-runtime.mjs",
-    "build": "tsc -p tsconfig.build.json && node ../../scripts/build-mcp-worker-runtime.mjs",
-    "build:vendor": "node ../../scripts/build-mcp-worker-runtime.mjs",
+    "prepack": "tsc -p tsconfig.build.json && node ../../scripts/build-mcp-worker-runtime.mjs && node ../../scripts/build-source-worker-runtime.mjs",
+    "build": "tsc -p tsconfig.build.json && node ../../scripts/build-mcp-worker-runtime.mjs && node ../../scripts/build-source-worker-runtime.mjs",
+    "build:vendor": "node ../../scripts/build-mcp-worker-runtime.mjs && node ../../scripts/build-source-worker-runtime.mjs",
     "build:bin": "bun run build:vendor && bun ../../scripts/build-binaries.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",

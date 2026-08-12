@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CliError, ExitCode } from '../src/errors.js';
-import { bundleServer, loadModule, writeNew } from '../src/lib/bundle.js';
+import { bundleServer, bundleSource, loadModule, writeNew } from '../src/lib/bundle.js';
 
 /**
  * These unit tests inject the loader/bundler seams so they run under the
@@ -69,6 +69,43 @@ describe('bundleServer', () => {
     await expect(
       bundleServer('/proj/server.ts', {
         loadImpl: async () => ({ default: { tools: [{ name: 'a' }] } }),
+        bundleImpl: async () => {
+          throw new CliError('boom', ExitCode.Usage);
+        },
+      }),
+    ).rejects.toMatchObject({ code: ExitCode.Usage });
+  });
+});
+
+describe('bundleSource', () => {
+  it('returns the deployable module for a source entry', async () => {
+    const bundled: string[] = [];
+    const bundle = await bundleSource('/proj/index.ts', {
+      loadImpl: async () => ({ default: { sync: async () => [] } }),
+      bundleImpl: async (entry) => {
+        bundled.push(entry);
+        return 'BUNDLE';
+      },
+    });
+    expect(bundle).toBe('BUNDLE');
+    expect(bundled).toEqual(['/proj/index.ts']);
+  });
+
+  it('refuses an entry whose default export is not a source', async () => {
+    // Caught here rather than by the sandbox on its first sync, which is hours
+    // later and somewhere the author cannot see.
+    await expect(
+      bundleSource('/proj/index.ts', {
+        loadImpl: async () => ({ default: { tools: [] } }),
+        bundleImpl: async () => 'BUNDLE',
+      }),
+    ).rejects.toMatchObject({ code: ExitCode.Usage });
+  });
+
+  it('propagates a bundler failure', async () => {
+    await expect(
+      bundleSource('/proj/index.ts', {
+        loadImpl: async () => ({ default: { sync: async () => [] } }),
         bundleImpl: async () => {
           throw new CliError('boom', ExitCode.Usage);
         },

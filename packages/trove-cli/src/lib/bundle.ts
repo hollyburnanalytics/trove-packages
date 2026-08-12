@@ -120,6 +120,62 @@ async function defaultBundleForDeploy(entry: string): Promise<string> {
   }
 }
 
+/**
+ * The default source deploy bundler: build the source + the runtime shim into a
+ * single ESM module for the deployed-source sandbox (worker conditions). The
+ * shim adapts the sandbox's `POST /sync` invoke to the `sync(ctx)` the author
+ * already wrote, so nothing in `index.ts` is deployment-specific.
+ *
+ * `@ontrove/source-runtime` is a VIRTUAL specifier — no such package exists.
+ * The plugin below answers it with the pre-bundled shim
+ * (`scripts/build-source-worker-runtime.mjs`), because the compiled binary has
+ * no on-disk `@ontrove/sdk` to bundle. The author's own `@ontrove/sdk` import
+ * resolves to the SAME module, which is why the shim re-exports the SDK: two
+ * copies would mean `defineSource` was not the function `runSource` expects.
+ */
+async function defaultBundleSourceForDeploy(entry: string): Promise<string> {
+  const sourceRuntime = (await import('../vendor/source-worker-runtime.js')).default;
+  const tmp = mkdtempSync(join(tmpdir(), 'trove-source-deploy-'));
+  const wrapper = join(tmp, 'entry.mjs');
+  // Import the source via an ABSOLUTE path: the wrapper lives in a temp dir, so
+  // a relative specifier would resolve against that dir, not the project.
+  writeFileSync(
+    wrapper,
+    `import source from ${JSON.stringify(resolve(entry))};\n` +
+      `import { createSourceWorker } from '@ontrove/source-runtime';\n` +
+      `export default createSourceWorker(source);\n`,
+  );
+  try {
+    const result = await Bun.build({
+      entrypoints: [wrapper],
+      target: 'browser',
+      conditions: ['workerd', 'worker', 'browser'],
+      plugins: [
+        {
+          name: 'ontrove-source-runtime-embedded',
+          setup(build: BunBuildPluginBuilder): void {
+            build.onResolve({ filter: /^@ontrove\/(source-runtime|sdk)$/ }, () => ({
+              path: '@ontrove/source-runtime',
+              namespace: 'ontrove-source-runtime',
+            }));
+            build.onLoad({ filter: /.*/, namespace: 'ontrove-source-runtime' }, () => ({
+              contents: sourceRuntime,
+              loader: 'js',
+            }));
+          },
+        },
+      ],
+    });
+    const out = result.outputs[0];
+    if (!result.success || out === undefined) {
+      throw usageError(`Failed to bundle ${entry} for deployment.`);
+    }
+    return await out.text();
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
 /* v8 ignore stop */
 
 /**
@@ -247,6 +303,33 @@ export async function bundleServer(
   const bundleFor = options.bundleImpl ?? defaultBundleForDeploy;
   const bundle = await bundleFor(entry);
   return { bundle, tools };
+}
+
+/**
+ * Bundle a source's `index.ts` into a deployable module for the deployed-source
+ * sandbox.
+ *
+ * The symmetric sibling of {@link bundleServer}, and deliberately smaller: a
+ * source has no tool list to cache, so there is one output. The entry is still
+ * loaded in-process first — the same check `trove source dev` makes — so
+ * "this is not a source" is reported here rather than as a sandbox that
+ * uploads cleanly and then fails on its first sync.
+ *
+ * @param entry - Absolute path to the source's `index.ts`.
+ * @param options - Injection points for tests (loader + bundler).
+ * @returns The deployable ESM module (default export = the invoke handler).
+ * @throws {@link CliError} (usage) when the entry is not a source or the bundle fails.
+ */
+export async function bundleSource(
+  entry: string,
+  options: LoadModuleOptions = {},
+): Promise<string> {
+  const source = await loadModule<{ sync?: unknown }>(entry, options);
+  if (typeof source.sync !== 'function') {
+    throw usageError(`${entry} default export is not a source (expected defineSource(...)).`);
+  }
+  const bundleFor = options.bundleImpl ?? defaultBundleSourceForDeploy;
+  return await bundleFor(entry);
 }
 
 /**

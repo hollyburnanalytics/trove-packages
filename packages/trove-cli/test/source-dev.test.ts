@@ -742,3 +742,176 @@ describe('source sync', () => {
     expect(writer.stdoutText()).toMatch(/indexed/);
   });
 });
+
+describe('source deploy', () => {
+  let dir: string;
+  let writer: CaptureWriter;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'trove-conn-'));
+    writer = captureWriter();
+    writeFileSync(join(dir, 'index.ts'), '// source');
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  /** A bundler dep that records the entry it was handed. */
+  function bundlerFor(entries: string[]): sourceDev.SourceDeployDeps {
+    return {
+      bundle: async (entry: string) => {
+        entries.push(entry);
+        return 'BUNDLE';
+      },
+    };
+  }
+
+  /** Write a manifest with the given overrides applied. */
+  function writeManifest(overrides: Record<string, unknown> = {}): void {
+    writeFileSync(
+      join(dir, 'manifest.json'),
+      JSON.stringify({
+        id: 'my-blog',
+        name: 'My Blog',
+        version: '1.2.0',
+        egress: ['example.com'],
+        ...overrides,
+      }),
+    );
+  }
+
+  /** A `deploySource` envelope with the given status. */
+  function deployResponse(status: string, error: string | null = null): unknown {
+    return {
+      data: {
+        deploySource: {
+          id: 'sd_1',
+          sourceType: 'dev/u_1/my-blog',
+          version: '1.2.0',
+          scriptName: 'src-u1-my-blog',
+          status,
+          sizeBytes: 6,
+          error,
+        },
+      },
+    };
+  }
+
+  it('bundles index.ts and sends the manifest with the bundle inlined', async () => {
+    writeManifest();
+    const entries: string[] = [];
+    const mock = mockFetch(deployResponse('LIVE'));
+    const code = await sourceDev.deploy(
+      ctxFor(mock, writer, dir),
+      parseArgs([dir], { value: ['slug'] }),
+      bundlerFor(entries),
+    );
+    expect(code).toBe(ExitCode.Success);
+    expect(entries).toEqual([join(dir, 'index.ts')]);
+    expect(mock.calls[0]?.operationName).toBe('CliDeploySource');
+    expect(mock.calls[0]?.variables.slug).toBe('my-blog');
+    expect(mock.calls[0]?.variables.manifest).toMatchObject({
+      id: 'my-blog',
+      version: '1.2.0',
+      egress: ['example.com'],
+      bundle: 'BUNDLE',
+    });
+  });
+
+  it('refuses a manifest with no egress, naming the file', async () => {
+    writeManifest({ egress: undefined });
+    const mock = mockFetch(deployResponse('LIVE'));
+    await expect(
+      sourceDev.deploy(ctxFor(mock, writer, dir), parseArgs([dir], { value: ['slug'] }), {}),
+    ).rejects.toMatchObject({ code: ExitCode.Usage });
+    // The refusal must name the file the author has open, and must happen
+    // before anything is bundled or sent.
+    await expect(
+      sourceDev.deploy(ctxFor(mock, writer, dir), parseArgs([dir], { value: ['slug'] }), {}),
+    ).rejects.toThrow(new RegExp(join(dir, 'manifest.json').replaceAll('/', '\\/')));
+    expect(mock.calls).toHaveLength(0);
+  });
+
+  it('refuses an empty egress list', async () => {
+    writeManifest({ egress: [] });
+    const mock = mockFetch(deployResponse('LIVE'));
+    await expect(
+      sourceDev.deploy(ctxFor(mock, writer, dir), parseArgs([dir], { value: ['slug'] }), {}),
+    ).rejects.toMatchObject({ code: ExitCode.Usage });
+  });
+
+  it('refuses an egress list that is not all hostnames', async () => {
+    writeManifest({ egress: ['example.com', 42] });
+    const mock = mockFetch(deployResponse('LIVE'));
+    await expect(
+      sourceDev.deploy(ctxFor(mock, writer, dir), parseArgs([dir], { value: ['slug'] }), {}),
+    ).rejects.toThrow(/non-empty hostname/);
+  });
+
+  it('takes the slug from --slug over the manifest id', async () => {
+    writeManifest();
+    const mock = mockFetch(deployResponse('LIVE'));
+    await sourceDev.deploy(
+      ctxFor(mock, writer, dir),
+      parseArgs([dir, '--slug', 'other-name'], { value: ['slug'] }),
+      bundlerFor([]),
+    );
+    expect(mock.calls[0]?.variables.slug).toBe('other-name');
+  });
+
+  it('requires a slug when the manifest has no id', async () => {
+    writeManifest({ id: undefined });
+    const mock = mockFetch(deployResponse('LIVE'));
+    await expect(
+      sourceDev.deploy(ctxFor(mock, writer, dir), parseArgs([dir], { value: ['slug'] }), {}),
+    ).rejects.toThrow(/--slug/);
+  });
+
+  it('errors when index.ts is absent', async () => {
+    writeManifest();
+    rmSync(join(dir, 'index.ts'));
+    const mock = mockFetch(deployResponse('LIVE'));
+    await expect(
+      sourceDev.deploy(ctxFor(mock, writer, dir), parseArgs([dir], { value: ['slug'] }), {}),
+    ).rejects.toThrow(/No index\.ts/);
+  });
+
+  it('fails when the deployment did not go live, saying why', async () => {
+    writeManifest();
+    const mock = mockFetch(deployResponse('FAILED', 'script exceeded the size limit'));
+    const code = await sourceDev.deploy(
+      ctxFor(mock, writer, dir),
+      parseArgs([dir], { value: ['slug'] }),
+      bundlerFor([]),
+    );
+    // Reporting success here would leave the author waiting for documents that
+    // nothing is going to produce.
+    expect(code).toBe(ExitCode.Transport);
+    expect(writer.stderrText()).toMatch(/script exceeded the size limit/);
+  });
+
+  it('fails a BUILDING deployment with a reason of its own', async () => {
+    writeManifest();
+    const mock = mockFetch(deployResponse('BUILDING'));
+    const code = await sourceDev.deploy(
+      ctxFor(mock, writer, dir),
+      parseArgs([dir], { value: ['slug'] }),
+      bundlerFor([]),
+    );
+    expect(code).toBe(ExitCode.Transport);
+    expect(writer.stderrText()).toMatch(/will not sync/);
+  });
+
+  it('renders the deployment as a human record', async () => {
+    writeManifest();
+    const mock = mockFetch(deployResponse('LIVE'));
+    const ctx = buildContext({
+      globals: {},
+      writer,
+      fetchImpl: mock.fetch,
+      configEnv: { home: dir, env: { TROVE_TOKEN: 'tok' } },
+      isTTY: true,
+    });
+    const code = await sourceDev.deploy(ctx, parseArgs([dir], { value: ['slug'] }), bundlerFor([]));
+    expect(code).toBe(ExitCode.Success);
+    expect(writer.stdoutText()).toMatch(/dev\/u_1\/my-blog/);
+    expect(writer.stdoutText()).toMatch(/example\.com/);
+  });
+});

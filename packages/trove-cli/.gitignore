@@ -1,5 +1,6 @@
 node_modules/
 dist/
 coverage/
-# Generated at build time by `build:vendor` (the committed .d.ts is the shim).
+# Generated at build time by `build:vendor` (the committed .d.ts files are the shims).
 src/vendor/mcp-worker-runtime.js
+src/vendor/source-worker-runtime.js

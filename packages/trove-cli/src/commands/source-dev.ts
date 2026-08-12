@@ -1,10 +1,10 @@
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { basename, isAbsolute, join, resolve } from 'node:path';
 import { runSource, type SourceDocument, validateSourceManifest } from '@ontrove/sdk';
 import type { CommandContext } from '../context.js';
 import { ExitCode, usageError } from '../errors.js';
 import { flag, type ParsedArgs } from '../lib/args.js';
-import { writeNew } from '../lib/bundle.js';
+import { bundleSource, writeNew } from '../lib/bundle.js';
 import {
   type IngestDocumentInput,
   parseCursor,
@@ -13,6 +13,7 @@ import {
 } from '../lib/source.js';
 import * as ops from '../operations.js';
 import { renderJson, renderRecord, renderTable, truncate } from '../output.js';
+import type { SourceDeployment } from '../types.js';
 import {
   assertDocuments,
   fixtureFetch,
@@ -26,13 +27,16 @@ import {
 } from './source-dev-project.js';
 
 /**
- * The source dev toolchain: `source init/dev/test/validate/
- * sync`, all over `@ontrove/sdk`. `init` scaffolds a project; `dev`/`test` run the
+ * The source dev toolchain: `source init/dev/test/validate/sync/deploy`, all
+ * over `@ontrove/sdk`. `init` scaffolds a project; `dev`/`test` run the
  * source's `sync(ctx)` locally (transpiled and run by Bun) and inspect the
  * output; `validate` lints the manifest; `sync` runs locally then pushes via
- * `mutation ingestDocuments` with cursor compare-and-swap. Execution is
- * client-side — the source's fetch runs on the developer's machine,
- * never in the cloud.
+ * `mutation ingestDocuments` with cursor compare-and-swap.
+ *
+ * Everything except `deploy` is client-side — the source's fetch runs on the
+ * developer's machine. `deploy` is the one verb that changes where the source
+ * runs: it uploads the source itself, after which Trove syncs it on schedule
+ * whether or not the author's machine is awake.
  *
  * @module
  */
@@ -323,6 +327,115 @@ export async function sync(
   return ExitCode.Success;
 }
 
+/** Injection point for {@link deploy} (so tests run without the Bun bundler). */
+export interface SourceDeployDeps {
+  /** The source bundler. Defaults to {@link bundleSource}. */
+  bundle?: (entry: string) => Promise<string>;
+}
+
+/**
+ * Read the manifest's `egress` allowlist, refusing a manifest without one.
+ *
+ * The server refuses this too. Refusing it here as well is the point: the
+ * allowlist is the deployed source's entire reach, so a deploy that omitted it
+ * would upload code guaranteed to fail at runtime — and the failure would
+ * appear as a network error hours later, on a machine the author cannot see,
+ * rather than as a sentence naming the file they have open.
+ *
+ * @param manifest - The parsed manifest.
+ * @param manifestPath - The file to name in the refusal.
+ * @returns The declared hosts.
+ * @throws {@link CliError} (usage) when `egress` is missing, empty, or not a list of hosts.
+ */
+function requireEgress(manifest: Record<string, unknown>, manifestPath: string): string[] {
+  const declared = manifest.egress;
+  if (!Array.isArray(declared) || declared.length === 0) {
+    throw usageError(
+      `${manifestPath} declares no \`egress\` — a deployed source can reach only the hosts it ` +
+        'lists, so a source without one can fetch nothing. Add e.g. "egress": ["example.com"].',
+    );
+  }
+  const hosts = declared.filter((h): h is string => typeof h === 'string' && h !== '');
+  if (hosts.length !== declared.length) {
+    throw usageError(`${manifestPath}: every \`egress\` entry must be a non-empty hostname.`);
+  }
+  return hosts;
+}
+
+/**
+ * `trove source deploy [path]` — bundle `index.ts` with the runtime shim and
+ * hand it to `mutation deploySource`, so the source runs on Trove's schedule
+ * instead of only while the author's machine is awake.
+ *
+ * The sibling of `trove mcp deploy`. Unlike `source sync`, which runs the sync
+ * here and pushes the documents, this uploads the source itself — after which
+ * nothing local is involved in a sync.
+ *
+ * @param ctx - The command context.
+ * @param args - Parsed positionals (`[path]`) + `--slug`.
+ * @param deps - Injectable bundler (tests).
+ * @returns The process exit code (non-zero when the deployment is not LIVE).
+ */
+export async function deploy(
+  ctx: CommandContext,
+  args: ParsedArgs,
+  deps: SourceDeployDeps = {},
+): Promise<number> {
+  const dir = projectDir(args);
+  const manifest = readManifest(dir);
+  const egress = requireEgress(manifest, join(dir, 'manifest.json'));
+  const slug = flag(args, 'slug') ?? (typeof manifest.id === 'string' ? manifest.id : undefined);
+  if (slug === undefined || slug === '') {
+    throw usageError("manifest.json needs a string 'id' to name the deployment (or pass --slug).");
+  }
+  const entry = join(dir, 'index.ts');
+  if (!existsSync(entry)) {
+    throw usageError(`No index.ts in '${dir}'. Run 'trove source init <name>' first.`);
+  }
+
+  ctx.writer.err(ctx.style.dim(`Bundling ${entry}…`));
+  const bundle = await (deps.bundle ?? bundleSource)(entry);
+
+  const data = await ctx.client().request<{ deploySource: SourceDeployment }>({
+    query: ops.DEPLOY_SOURCE,
+    operationName: 'CliDeploySource',
+    variables: { slug, manifest: { ...manifest, bundle } },
+  });
+  const deployment = data.deploySource;
+
+  if (ctx.output.format !== 'human') {
+    ctx.writer.out(renderJson(deployment, ctx.output.format));
+  } else {
+    ctx.writer.out(
+      renderRecord(
+        [
+          ['source type', deployment.sourceType],
+          ['version', deployment.version],
+          ['status', deployment.status],
+          ['size', `${String(deployment.sizeBytes ?? 0)} bytes`],
+          ['egress', egress.join(', ')],
+        ],
+        ctx.style,
+      ),
+    );
+  }
+
+  // Anything but LIVE means no sandbox is serving this source: it will not sync,
+  // and reporting success would leave the author waiting for documents that
+  // cannot arrive.
+  if (deployment.status !== 'LIVE') {
+    ctx.writer.err(
+      ctx.style.yellow(
+        `✗ ${slug} is ${deployment.status}, not LIVE — ` +
+          (deployment.error ?? 'nothing is serving this source, so it will not sync.'),
+      ),
+    );
+    return ExitCode.Transport;
+  }
+  ctx.writer.err(ctx.style.green(`✓ deployed ${slug} (version ${deployment.version})`));
+  return ExitCode.Success;
+}
+
 /** Flag specs for the source dev commands. */
 export const flagSpecs = {
   init: {},
@@ -330,4 +443,5 @@ export const flagSpecs = {
   test: { value: ['fixtures', 'config'] },
   validate: {},
   sync: { value: ['source', 'feed', 'config'], boolean: ['create'] },
+  deploy: { value: ['slug'] },
 };

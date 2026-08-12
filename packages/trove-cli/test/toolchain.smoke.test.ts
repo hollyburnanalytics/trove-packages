@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { run } from '../src/cli.js';
 import { ExitCode } from '../src/errors.js';
-import { bundleServer } from '../src/lib/bundle.js';
+import { bundleServer, bundleSource } from '../src/lib/bundle.js';
 import {
   type CapturedRequest,
   type CaptureWriter,
@@ -282,5 +282,100 @@ describe('mcp deploy via run() (real Bun bundler, mocked GraphQL)', () => {
     const code = await runCli(['deploy', '--dir', home.home], mock, writer, home);
     expect(code).toBe(ExitCode.Success);
     expect(mock.calls[0]?.operationName).toBe('CliDeployServer');
+  });
+});
+
+describe('source deploy bundling (real Bun bundler + embedded source runtime)', () => {
+  let proj: string;
+  beforeEach(() => {
+    proj = mkdtempSync(join(tmpdir(), 'trove-proj-'));
+  });
+  afterEach(() => rmSync(proj, { recursive: true, force: true }));
+
+  it('bundles a hand-written source with the runtime shim in front of it', async () => {
+    const entry = join(proj, 'index.ts');
+    writeFileSync(entry, SOURCE_SRC);
+    // No injected seams: this drives defaultBundleSourceForDeploy, which runs
+    // Bun.build over a wrapper and resolves the shim from the embedded runtime.
+    const bundle = await bundleSource(entry);
+    expect(bundle.length).toBeGreaterThan(1000);
+    expect(bundle).toMatch(/as default/);
+    // Self-contained: neither the shim nor the SDK is left as an import the
+    // sandbox would have to resolve (it cannot — there is no registry there).
+    expect(bundle).not.toMatch(/from\s*['"]@ontrove\/(sdk|source-runtime)['"]/);
+  });
+
+  it('serves the invoke contract when the bundled module is executed', async () => {
+    const entry = join(proj, 'index.ts');
+    writeFileSync(entry, SOURCE_SRC);
+    const bundle = await bundleSource(entry);
+    const modulePath = join(proj, 'deployed.mjs');
+    writeFileSync(modulePath, bundle);
+
+    const worker = (await import(modulePath)).default as {
+      fetch(request: Request): Promise<Response>;
+    };
+    const response = await worker.fetch(
+      new Request('https://invoke/sync', { method: 'POST', body: JSON.stringify({ config: {} }) }),
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { documents: Array<{ id: string; title: string }> };
+    expect(body.documents).toEqual([{ id: 'a', title: 'A', text: 'body', url: 'https://a' }]);
+  });
+});
+
+describe('source deploy via run() (real Bun bundler, mocked GraphQL)', () => {
+  let writer: CaptureWriter;
+  let home: TempHome;
+  let proj: string;
+  beforeEach(() => {
+    writer = captureWriter();
+    home = tempHome();
+    proj = mkdtempSync(join(tmpdir(), 'trove-proj-'));
+  });
+  afterEach(() => {
+    home.cleanup();
+    rmSync(proj, { recursive: true, force: true });
+  });
+
+  it('bundles index.ts, inlines it in the manifest, calls CliDeploySource', async () => {
+    writeFileSync(
+      join(proj, 'manifest.json'),
+      JSON.stringify({ id: 'blog', name: 'Blog', version: '1.0.0', egress: ['a.test'] }),
+    );
+    writeFileSync(join(proj, 'index.ts'), SOURCE_SRC);
+    const mock = mockFetch({
+      data: {
+        deploySource: {
+          id: 'sd_1',
+          sourceType: 'dev/u_1/blog',
+          version: '1.0.0',
+          scriptName: 'src-u1-blog',
+          status: 'LIVE',
+          sizeBytes: 1,
+          error: null,
+        },
+      },
+    });
+    const code = await runCli(['source', 'deploy', proj], mock, writer, home);
+    expect(code).toBe(ExitCode.Success);
+    expect(mock.calls[0]?.operationName).toBe('CliDeploySource');
+    expect(mock.calls[0]?.variables.slug).toBe('blog');
+    const manifest = mock.calls[0]?.variables.manifest as { bundle?: string; egress?: string[] };
+    expect(typeof manifest.bundle).toBe('string');
+    expect(manifest.egress).toEqual(['a.test']);
+  });
+
+  it('refuses a manifest with no egress before bundling anything', async () => {
+    writeFileSync(
+      join(proj, 'manifest.json'),
+      JSON.stringify({ id: 'blog', name: 'Blog', version: '1.0.0' }),
+    );
+    writeFileSync(join(proj, 'index.ts'), SOURCE_SRC);
+    const mock = mockFetch({});
+    const code = await runCli(['source', 'deploy', proj], mock, writer, home);
+    expect(code).toBe(ExitCode.Usage);
+    expect(writer.stderrText()).toContain('manifest.json');
+    expect(mock.calls).toHaveLength(0);
   });
 });

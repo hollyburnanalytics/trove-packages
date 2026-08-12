@@ -11,8 +11,9 @@
  *
  * `esbuild` is marked `--external`: it is the Node-fallback bundler and is never
  * reached under Bun (the binary uses Bun-native bundling), so it must not be
- * pulled into the binary. Requires `build:vendor` to have run first (the deploy
- * bundler embeds the pre-built MCP worker runtime).
+ * pulled into the binary. Requires `build:vendor` to have run first: the deploy
+ * bundlers embed the pre-built MCP worker runtime (`mcp deploy`) and source
+ * worker runtime (`source deploy`).
  *
  * @module
  */

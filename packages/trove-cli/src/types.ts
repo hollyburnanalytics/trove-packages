@@ -102,3 +102,17 @@ export interface McpServer {
   activeDeployment: { id: string; version: string; status: string } | null;
   deployments: Array<{ id: string; version: string; status: string; createdAt: string }>;
 }
+
+/** One deployment of a source package, as returned by `deploySource`. */
+export interface SourceDeployment {
+  id: string;
+  /** The identity the deployment's documents carry (marks them as your own). */
+  sourceType: string;
+  version: string;
+  scriptName: string;
+  /** `LIVE`, `BUILDING`, `FAILED` or `SUPERSEDED` — only `LIVE` will ever sync. */
+  status: string;
+  sizeBytes: number | null;
+  /** Why the deployment did not go live, when it did not. */
+  error: string | null;
+}

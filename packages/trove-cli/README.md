@@ -77,6 +77,7 @@ trove source dev --json | jq '.[].title'      # run sync(ctx) locally, no upload
 trove source test --fixtures fixtures.json    # assert document shape offline
 trove source validate                         # lint manifest (credential-key check)
 trove source sync --source "My Blog" --feed default --create   # → ingestDocuments
+trove source deploy                           # → deploySource; Trove runs it on a schedule
 
 # Toolkits (@ontrove/mcp)
 trove mcp init my-server                 # scaffold manifest.json + server.ts
@@ -151,6 +152,7 @@ overrides a profile's `api_url`.
 | `source test` | — (local fixtures assertion) | Local |
 | `source validate` | — (`validateSourceManifest`) | Local |
 | `source sync` | `mutation ingestDocuments` (+ `createSource`/`addFeed` w/ `--create`) | Write |
+| `source deploy` | `mutation deploySource` | Write |
 | `mcp init` | — (scaffold `@ontrove/mcp` project) | Local |
 | `mcp dev` | — (local server over `127.0.0.1`) | Local |
 | `mcp logs` | — (explains the deployed runtime log gap) | Info |
@@ -168,8 +170,22 @@ runtime** (where each request runs in an isolated sandbox) is still **PROPOSED**
 so `mcp logs` has no GraphQL operation to call —
 it explains that per-script logs come from the deployed runtime and points there
 rather than inventing a fake op. Everything else — the `source init/dev/test/
-validate/sync` and `mcp init/dev` local toolchain, `login`'s loopback OAuth flow,
-keychain token storage, `get` word-paging, and `secret ls` — is implemented here.
+validate/sync/deploy` and `mcp init/dev` local toolchain, `login`'s loopback OAuth
+flow, keychain token storage, `get` word-paging, and `secret ls` — is implemented
+here.
+
+`source deploy` is the one source verb that moves where the sync runs: it bundles
+`index.ts` with a runtime shim that adapts the sandbox's request to your
+`sync(ctx)`, so nothing in your source is deployment-specific. Two rules follow
+from the sandbox, and the CLI refuses the deploy rather than letting you find out
+later:
+
+- **`manifest.json` must declare `egress`** — the list of hosts the source may
+  reach. It is the deployed source's entire reach, so a source without one can
+  fetch nothing.
+- **A deployed source gets no credentials.** `sync(ctx)` sees preferences
+  (`ctx.config`) and nothing else. A source that needs a secret stays on
+  `source sync`, where it runs on your own machine.
 
 ## Development
 

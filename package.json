@@ -6,7 +6,9 @@
   "license": "MIT",
   "author": "Hollyburn Analytics Inc.",
   "homepage": "https://ontrove.sh",
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "packageManager": "bun@1.2.0",
   "engines": {
     "bun": ">=1.2.0",
@@ -26,7 +28,7 @@
     "check": "bun run build && bun run lint && bun run lint:knip && bun run lint:baseline && bun run typecheck && bun run test:coverage && bun run refs:check && bun run docs:examples",
     "prepare": "lefthook install",
     "changeset": "changeset",
-    "version": "changeset version",
+    "version": "changeset version && bun install",
     "release": "bun run build && changeset publish"
   },
   "devDependencies": {

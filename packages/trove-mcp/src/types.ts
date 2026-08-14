@@ -210,7 +210,7 @@ export interface TroveClient {
  * acquire one to agree on a shape. A type-level assertion in `@ontrove/cli`,
  * which depends on both, is what stops them drifting.
  */
-export interface LogChannel {
+interface LogChannel {
   (...args: unknown[]): void;
   /** Ordinary progress. The default level for a bare `log(...)` call. */
   info(...args: unknown[]): void;

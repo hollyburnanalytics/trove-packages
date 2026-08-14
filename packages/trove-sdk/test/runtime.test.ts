@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { defineSource } from '../src/define.js';
 import { runSource } from '../src/runtime.js';
-import type { SourceContext, SourceDocument, Watermark } from '../src/types.js';
+import type { SourceContext, SourceDocument, TroveSource, Watermark } from '../src/types.js';
 
 describe('runSource — success', () => {
   it('runs sync and returns validated documents with a cursor', async () => {
@@ -207,5 +207,133 @@ describe('runSource — cursor passthrough', () => {
       },
     });
     await runSource(source);
+  });
+});
+
+describe('the context spine that both SDKs share', () => {
+  /** A source that reports whatever it was handed, for probing `ctx`. */
+  const probe = (report: (ctx: SourceContext) => unknown): TroveSource => ({
+    async sync(ctx) {
+      return { documents: [], cursor: { type: 'none' }, ...(report(ctx) as object) };
+    },
+  });
+
+  it('hands over a declared secret by name', async () => {
+    let seen = '';
+    await runSource(
+      {
+        async sync(ctx) {
+          seen = await ctx.secret('X_BEARER_TOKEN');
+          return [];
+        },
+      },
+      { secrets: { X_BEARER_TOKEN: 'tok' } },
+    );
+    expect(seen).toBe('tok');
+  });
+
+  it('rejects by name rather than resolving undefined', async () => {
+    // A source that needs a key cannot proceed without one, so `undefined` only
+    // moves the failure downstream — into a 401 that points at the upstream API
+    // instead of at the credential nobody set.
+    await expect(
+      runSource(
+        {
+          async sync(ctx) {
+            await ctx.secret('MISSING_KEY');
+            return [];
+          },
+        },
+        {},
+      ),
+    ).rejects.toThrow(/MISSING_KEY/);
+  });
+
+  it('treats requireSecret as the same door', async () => {
+    let seen = '';
+    await runSource(
+      {
+        async sync(ctx) {
+          seen = await ctx.requireSecret('K');
+          return [];
+        },
+      },
+      { secrets: { K: 'v' } },
+    );
+    expect(seen).toBe('v');
+  });
+
+  it('has no deadline locally — a developer watching their own sync is the budget', async () => {
+    let deadline = 0;
+    await runSource(
+      {
+        async sync(ctx) {
+          deadline = ctx.deadline;
+          return [];
+        },
+      },
+      {},
+    );
+    expect(deadline).toBe(Number.POSITIVE_INFINITY);
+
+    let bounded = 0;
+    await runSource(
+      {
+        async sync(ctx) {
+          bounded = ctx.deadline;
+          return [];
+        },
+      },
+      { deadline: 42 },
+    );
+    expect(bounded).toBe(42);
+  });
+
+  it('offers log as callable AND levelled, so one source runs under either host', async () => {
+    const lines: unknown[][] = [];
+    await runSource(
+      {
+        async sync(ctx) {
+          ctx.log('bare');
+          ctx.log.info('i');
+          ctx.log.warn('w');
+          ctx.log.error('e');
+          return [];
+        },
+      },
+      { logSink: (args) => lines.push(args) },
+    );
+    expect(lines).toEqual([['bare'], ['i'], ['w'], ['e']]);
+  });
+
+  it('carries feedName, feedUrl and stats out of the run', async () => {
+    // Dropped by an earlier version, which meant a deployed source could not
+    // name its own feed, report that the feed had moved, or ask the runner to
+    // drain again — three things the same source does fine on a Mac.
+    const result = await runSource(
+      probe(() => ({
+        feedName: 'Simon Willison',
+        feedUrl: 'https://example.com/feed.xml',
+        stats: { fetched: 0, remaining: 12 },
+      })),
+      {},
+    );
+    expect(result.feedName).toBe('Simon Willison');
+    expect(result.feedUrl).toBe('https://example.com/feed.xml');
+    expect(result.stats).toEqual({ fetched: 0, remaining: 12 });
+  });
+
+  it('treats a source that falls off the end as an empty run, not a malformed one', async () => {
+    // Adapters that only ever no-op sometimes return nothing at all. Refusing
+    // that breaks a working source over a style detail.
+    const result = await runSource(
+      {
+        async sync() {
+          return undefined as never;
+        },
+      },
+      {},
+    );
+    expect(result.documents).toEqual([]);
   });
 });

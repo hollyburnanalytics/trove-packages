@@ -2,20 +2,41 @@
   "$schema": "https://unpkg.com/knip@latest/schema.json",
   "workspaces": {
     ".": {
-      "entry": ["scripts/*.mjs"],
-      "project": ["scripts/**/*.mjs"]
+      "entry": [
+        "scripts/*.mjs"
+      ],
+      "project": [
+        "scripts/**/*.mjs"
+      ]
     },
     "packages/trove-sdk": {
-      "entry": ["src/index.ts"],
-      "project": ["src/**/*.ts", "test/**/*.ts"]
+      "entry": [
+        "src/index.ts",
+        "src/contract/index.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "test/**/*.ts"
+      ]
     },
     "packages/trove-mcp": {
-      "entry": ["src/index.ts"],
-      "project": ["src/**/*.ts", "test/**/*.ts"]
+      "entry": [
+        "src/index.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "test/**/*.ts"
+      ]
     },
     "packages/trove-cli": {
-      "entry": ["src/index.ts", "src/runtime/source-shim.ts"],
-      "project": ["src/**/*.ts", "test/**/*.ts"]
+      "entry": [
+        "src/index.ts",
+        "src/runtime/source-shim.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "test/**/*.ts"
+      ]
     }
   }
 }

@@ -318,3 +318,70 @@ describe('ctx.fetch & ctx.log', () => {
     expect(seen).toBe('user_zzz');
   });
 });
+
+describe('the context spine a toolkit shares with a source', () => {
+  /** Build a one-tool server whose handler probes `ctx`, and run it. */
+  async function probe(
+    handler: (
+      ctx: Parameters<Parameters<typeof defineMcpServer>[0]['tools'][number]['handler']>[1],
+    ) => unknown,
+    call: Partial<McpToolCall> = {},
+  ): Promise<unknown> {
+    let seen: unknown;
+    const server = defineMcpServer({
+      tools: [
+        {
+          name: 't',
+          description: 'd',
+          input: z.object({}),
+          handler: async (_a, ctx) => {
+            seen = handler(ctx);
+            return 'ok';
+          },
+        },
+      ],
+    });
+    await server.handle(baseCall({ tool: 't', ...call }));
+    return seen;
+  }
+
+  it('offers log as callable AND levelled, so one module runs under either host', async () => {
+    // `@ontrove/mcp` has always had `log(...)`; Trove's cloud adapters call
+    // `log.info(...)`. Both work, which is what lets a module be written once.
+    const kinds = await probe((ctx) => {
+      ctx.log('bare');
+      return ['info', 'warn', 'error'].map((k) => typeof (ctx.log as never)[k]);
+    });
+    expect(kinds).toEqual(['function', 'function', 'function']);
+  });
+
+  it('every log level is callable without throwing', async () => {
+    await expect(
+      probe((ctx) => {
+        ctx.log.info('i');
+        ctx.log.warn('w');
+        ctx.log.error('e');
+        return true;
+      }),
+    ).resolves.toBe(true);
+  });
+
+  it('supplies a clock, so a tool never reaches for a global one', async () => {
+    const now = await probe((ctx) => ctx.now());
+    expect(now).toBeInstanceOf(Date);
+  });
+
+  it("hands over the caller's settings, frozen", async () => {
+    // Frozen because these are the user's stored values, not scratch space: a
+    // tool that mutated its own settings mid-call would confuse only itself.
+    const config = (await probe((ctx) => ctx.config, {
+      config: { home_airports: ['YVR'] },
+    })) as Record<string, unknown>;
+    expect(config).toEqual({ home_airports: ['YVR'] });
+    expect(Object.isFrozen(config)).toBe(true);
+  });
+
+  it('sees {} when the toolkit declares no settings', async () => {
+    expect(await probe((ctx) => ctx.config)).toEqual({});
+  });
+});

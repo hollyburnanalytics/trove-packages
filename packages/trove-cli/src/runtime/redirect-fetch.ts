@@ -6,10 +6,10 @@
  * shape, and it is worth reading (and testing) on its own.
  *
  * A deployed source reaches only the hosts its manifest declares, and that
- * allowlist is enforced per subrequest as the isolate's traffic leaves. A
+ * allowlist is enforced per subrequest as the hosted runtime's traffic leaves. A
  * runtime that auto-follows redirects makes the later hops inside one
  * subrequest, so only the FIRST hop is checked — an allowed host could then
- * redirect the isolate anywhere. Following each hop by hand keeps every hop a
+ * redirect the hosted runtime anywhere. Following each hop by hand keeps every hop a
  * fresh, individually-checked subrequest.
  *
  * Refusing redirects outright would be simpler and is not an option: feedburner,

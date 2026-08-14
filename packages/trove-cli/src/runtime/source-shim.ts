@@ -48,13 +48,13 @@ export interface SourceInvokeBody {
    */
   cursor?: unknown;
   /**
-   * How long the isolate has, as a duration. Surfaced as `ctx.deadline`, an
+   * How long the run has, as a duration. Surfaced as `ctx.deadline`, an
    * absolute epoch-ms instant — the spine's shape, so a source that paces
    * itself does so identically here and on the Mac.
    *
    * A relative duration on the wire and an absolute instant in the context is
    * deliberate: the wire value is computed by a runner on a different machine,
-   * and two clocks that disagree would hand the isolate a deadline already in
+   * and two clocks that disagree would hand the run a deadline already in
    * the past.
    */
   deadlineMs?: number;
@@ -229,7 +229,7 @@ export async function handleInvoke(
     // exactly like a pasted key to the code reading it.
     ...(body.credentials !== undefined && { secrets: body.credentials }),
     // Relative on the wire, absolute in the context. The runner computes the
-    // budget on its own machine, so sending an instant would hand the isolate a
+    // budget on its own machine, so sending an instant would hand the run a
     // deadline from a clock it cannot check.
     ...(body.deadlineMs !== undefined && { deadline: Date.now() + body.deadlineMs }),
     // The global fetch, so the adapter gets the redirect policy whether it
@@ -276,7 +276,7 @@ function asSource(source: DeployableSource): TroveSource {
 }
 
 /**
- * Wrap a source as the isolate's fetch handler.
+ * Wrap a source as the hosted runtime's fetch handler.
  *
  * @param source - The author's default export: a `defineSource(...)` result or a bare `sync`.
  * @returns The worker the deployed module default-exports.
@@ -296,7 +296,7 @@ export function createSourceWorker(source: DeployableSource): SourceWorker {
         const body = (await request.json()) as SourceInvokeBody;
         return Response.json(await handleInvoke(normalized, body, logs));
       } catch (err) {
-        // A 500 carrying the message and the logs so far. An isolate that
+        // A 500 carrying the message and the logs so far. A run that
         // swallowed its error and answered `{documents: []}` would read to the
         // runner as a successful empty sync, and the cursor would advance past
         // whatever it failed to fetch.

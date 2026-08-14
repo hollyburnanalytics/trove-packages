@@ -310,7 +310,7 @@ export interface SourceContext<C = Record<string, unknown>> extends ExtensionCon
    * When this round must be finished, as epoch milliseconds.
    *
    * A sync is given a budget, not unlimited time — in the cloud because the
-   * isolate has a CPU ceiling, on the Mac because a user is waiting. A source
+   * hosted runtime has a CPU ceiling, on the Mac because a user is waiting. A source
    * that may run long should check this between units of work and return what
    * it has, advancing the cursor honestly, rather than being cut off mid-item.
    *

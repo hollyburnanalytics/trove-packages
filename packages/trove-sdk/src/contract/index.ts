@@ -89,7 +89,7 @@ export interface ContractConstants {
   defaultDeadlineMs: number;
 }
 
-/** One request the isolate must accept or refuse purely on method and path. */
+/** One request the hosted runtime must accept or refuse purely on method and path. */
 export interface RouteCase {
   /** What this case pins. */
   name: string;
@@ -99,7 +99,7 @@ export interface RouteCase {
   method: string;
   /** Absolute request URL. */
   url: string;
-  /** The status the isolate must answer with. */
+  /** The status the hosted runtime must answer with. */
   status: number;
 }
 
@@ -152,7 +152,7 @@ export interface RoundTripCase {
   why: string;
   /** How the adapter behaves. */
   adapter: AdapterSpec;
-  /** The exact JSON body the isolate must produce. */
+  /** The exact JSON body the hosted runtime must produce. */
   wire: Record<string, unknown>;
   /** The exact key set of that body — absence is half the contract. */
   wireKeys: string[];
@@ -219,6 +219,15 @@ export interface HttpCase {
 
 /** The whole fixture file, typed. */
 export interface ContractFixtures {
+  /**
+   * Which contract this file IS — `source-invoke`.
+   *
+   * Present in the JSON from the start and missing from this type until a test
+   * asserted on it. It matters most to the reader that cannot use this type at
+   * all: the Mac runner opens the raw file and has nothing but these keys to
+   * confirm it read the right one.
+   */
+  contract: string;
   /** Bumped when a change is not backwards compatible for installed runtimes. */
   version: number;
   /** Limits and identifiers. */

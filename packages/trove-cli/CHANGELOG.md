@@ -1,32 +1,5 @@
 # @ontrove/cli
 
-## 0.11.0
-
-### Minor Changes
-
-- `trove mcp deploy --for <user>` — deploy into another account, in batches.
-
-  `--dir` and `--for` are both repeatable, so one command covers N toolkits ×
-  M accounts. `--for` is admin-only, enforced by the server rather than here: a
-  CLI that decided who may deploy where would be a CLI you could edit.
-
-  Every cell reports and one failure does not stop the rest — a batch that
-  abandoned the remaining work on the first error would leave you guessing which
-  of twelve deploys had happened. The exit code is non-zero if any cell failed,
-  so a script cannot read a partial success as a whole one.
-
-  A single deploy is unchanged, deliberately: same output, same JSON shape, same
-  namespaced tool names. Only a batch prints a table.
-
-  The bundle is built once per toolkit however many recipients there are. It is a
-  pure function of the source, so rebuilding per account would only cost time and
-  risk two accounts getting different bytes.
-
-### Patch Changes
-
-- @ontrove/sdk@0.11.0
-- @ontrove/mcp@0.11.0
-
 ## 0.10.1
 
 ### Patch Changes

@@ -299,30 +299,6 @@ export const MCP_SERVERS = /* GraphQL */ `
   }
 `;
 
-/**
- * `mutation adminDeployServer` — deploy a toolkit into ANOTHER tenant's account.
- *
- * Admin-only, server-side. Same shape as {@link DEPLOY_SERVER} plus the
- * recipient, so `--for` is the only difference at the call site.
- */
-export const ADMIN_DEPLOY_SERVER = /* GraphQL */ `
-  mutation CliAdminDeployServer(
-    $clerkUserId: ID!
-    $name: String!
-    $slug: String!
-    $manifest: JSON!
-  ) {
-    adminDeployServer(clerkUserId: $clerkUserId, name: $name, slug: $slug, manifest: $manifest) {
-      id
-      version
-      status
-      scriptName
-      sizeBytes
-      tools { name description }
-    }
-  }
-`;
-
 /** `mutation deployServer` — register/version a toolkit deployment. */
 export const DEPLOY_SERVER = /* GraphQL */ `
   mutation CliDeployServer($name: String!, $slug: String!, $manifest: JSON!) {

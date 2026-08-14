@@ -1,6 +1,6 @@
 {
   "name": "@ontrove/cli",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "description": "The Trove command-line tool — a scriptable GraphQL client for your personal knowledge base, and the toolchain for authoring sources and building & deploying toolkits.",
   "type": "module",
   "license": "MIT",
@@ -50,8 +50,8 @@
     "test:smoke": "bun run build:vendor && bun test test/toolchain.smoke.test.ts"
   },
   "dependencies": {
-    "@ontrove/mcp": "^0.10.1",
-    "@ontrove/sdk": "^0.10.1",
+    "@ontrove/mcp": "^0.10.2",
+    "@ontrove/sdk": "^0.10.2",
     "open": "^10.1.0",
     "zod": "^4"
   },

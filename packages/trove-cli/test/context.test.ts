@@ -1,3 +1,5 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadConfig, persistToken } from '../src/config.js';
 import { buildContext } from '../src/context.js';
@@ -132,5 +134,85 @@ describe('client() silent token refresh', () => {
     await expect(
       ctx.client().request({ query: 'query CliStats { stats { totalDocuments } }' }),
     ).rejects.toMatchObject({ code: 4 });
+  });
+});
+
+describe('a stored refresh token, with no access token', () => {
+  let home: TempHome;
+  beforeEach(() => {
+    home = tempHome();
+  });
+  afterEach(() => home.cleanup());
+
+  /** Write a profile that has refresh credentials but no access token. */
+  function refreshOnlyProfile(): void {
+    writeFileSync(
+      join(home.home, '.trove', 'config.toml'),
+      [
+        'default_profile = "prod"',
+        '',
+        '[profiles.prod]',
+        'api_url = "https://api.example"',
+        'refresh_token = "rt-1"',
+        'token_endpoint = "https://issuer.example/oauth/token"',
+        'client_id = "cid"',
+      ].join('\n'),
+    );
+  }
+
+  it('mints a token on the first 401 instead of reporting "not logged in"', async () => {
+    // The state a few minutes after `trove login`: the access token is
+    // short-lived and gone, the refresh token is right there. Reporting that as
+    // logged out sends someone to repeat the thing they just did — which does
+    // not fix it either, because the next login leaves them in the same state.
+    mkdirSync(join(home.home, '.trove'), { recursive: true });
+    refreshOnlyProfile();
+
+    let calls = 0;
+    const fetchImpl = (async (url: string, init?: RequestInit) => {
+      calls += 1;
+      if (String(url).includes('/oauth/token')) {
+        return new Response(JSON.stringify({ access_token: 'fresh-at' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      const auth = (init?.headers as Record<string, string> | undefined)?.authorization;
+      // Unauthenticated on the first pass, satisfied once refreshed — which is
+      // exactly the sequence `onAuthFailure` exists to drive.
+      if (auth !== 'Bearer fresh-at') return new Response('{}', { status: 401 });
+      return new Response(JSON.stringify({ data: { ok: true } }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as unknown as typeof fetch;
+
+    const ctx = buildContext({
+      globals: {},
+      writer: captureWriter(),
+      fetchImpl,
+      configEnv: { home: home.home, env: {} },
+    });
+
+    // The assertion that matters: building the client does not throw.
+    const data = await ctx.client().request<{ ok: boolean }>({ query: '{ok}' });
+    expect(data).toEqual({ ok: true });
+    expect(calls).toBeGreaterThanOrEqual(2);
+  });
+
+  it('still refuses when there are no credentials at all', () => {
+    // The genuinely logged-out case has to keep failing, and keep saying the
+    // one thing that fixes it.
+    mkdirSync(join(home.home, '.trove'), { recursive: true });
+    writeFileSync(
+      join(home.home, '.trove', 'config.toml'),
+      'default_profile = "prod"\n\n[profiles.prod]\napi_url = "https://api.example"\n',
+    );
+    const ctx = buildContext({
+      globals: {},
+      writer: captureWriter(),
+      configEnv: { home: home.home, env: {} },
+    });
+    expect(() => ctx.client()).toThrow(/Not logged in/);
   });
 });

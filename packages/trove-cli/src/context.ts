@@ -94,10 +94,24 @@ export function buildContext(options: BuildContextOptions): CommandContext {
     fetchImpl,
     configEnv,
     client(): GraphQLClient {
-      const profile = requireAuth(configEnv);
+      // A missing ACCESS token is not the same as being logged out. `trove
+      // login` stores a refresh token and the access token is short-lived, so
+      // "no access token, but refresh credentials present" is the ordinary
+      // state a few minutes after signing in — and reporting it as "Not logged
+      // in. Run `trove login`" sends someone to repeat the thing they just did,
+      // which does not fix it either.
+      //
+      // `onAuthFailure` already knows how to mint one; it simply never got the
+      // chance, because `requireAuth` threw locally before any request could
+      // come back 401. So when credentials exist, build the client and let the
+      // first 401 drive the same refresh that already renews an EXPIRED token
+      // mid-command.
+      const resolved = resolveProfile(loadConfig(configEnv), configEnv);
+      const canRefresh = !resolved.token && refreshCredentials(resolved) !== null;
+      const profile = canRefresh ? resolved : requireAuth(configEnv);
       return new GraphQLClient({
         apiUrl: profile.apiUrl,
-        token: profile.token,
+        token: profile.token ?? '',
         fetchImpl,
         onAuthFailure: () => refreshActiveToken(fetchImpl, configEnv),
       });

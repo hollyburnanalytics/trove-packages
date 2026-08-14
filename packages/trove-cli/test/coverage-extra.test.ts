@@ -885,3 +885,100 @@ describe('remaining branch coverage', () => {
     expect(writer.stderrText()).toMatch(/deployed/);
   });
 });
+
+describe('mcp deploy — batch, and deploying on behalf', () => {
+  let writer: CaptureWriter;
+  let home: TempHome;
+
+  beforeEach(() => {
+    writer = captureWriter();
+    home = tempHome();
+    writeFileSync(join(home.home, 'manifest.json'), JSON.stringify({ name: 'S', slug: 'my' }));
+    writeFileSync(join(home.home, 'server.ts'), 'export default {};\n');
+  });
+  afterEach(() => home.cleanup());
+
+  /** A deploy response for either mutation, so one mock serves both paths. */
+  const ok = (version: string) => ({
+    id: 'd',
+    version,
+    status: 'LIVE',
+    scriptName: 's',
+    sizeBytes: 1,
+    tools: [{ name: 'search', description: null }],
+  });
+
+  it('sends the recipient on --for, using the admin mutation', async () => {
+    const mock = mockFetch({ data: { adminDeployServer: ok('v1') } });
+    const code = await deployDirect(['--dir', home.home, '--for', 'user_x'], mock, writer, home);
+    expect(code).toBe(ExitCode.Success);
+    expect(mock.calls[0]?.query).toContain('adminDeployServer');
+    expect(mock.calls[0]?.variables.clerkUserId).toBe('user_x');
+  });
+
+  it('deploys to every recipient named, not just the last', async () => {
+    // `flag()` returns the LAST value of a repeated flag, which is the right
+    // default everywhere else and would silently drop recipients here.
+    const mock = mockFetch({ data: { adminDeployServer: ok('v1') } });
+    await deployDirect(
+      ['--dir', home.home, '--for', 'user_a', '--for', 'user_b'],
+      mock,
+      writer,
+      home,
+    );
+    expect(mock.calls.map((c) => c.variables.clerkUserId)).toEqual(['user_a', 'user_b']);
+  });
+
+  it('keeps going after a failed cell, and exits non-zero', async () => {
+    // A batch that stopped at the first error would leave the operator guessing
+    // which of the remaining deploys had happened; one that reported failures
+    // and exited 0 would be invisible to anything reading exit codes.
+    let n = 0;
+    const mock = mockFetch(() => {
+      n += 1;
+      return n === 1
+        ? { errors: [{ message: 'No tenant user_a' }] }
+        : { data: { adminDeployServer: ok('v1') } };
+    });
+    const code = await deployDirect(
+      ['--dir', home.home, '--for', 'user_a', '--for', 'user_b'],
+      mock,
+      writer,
+      home,
+      { human: true },
+    );
+    expect(mock.calls).toHaveLength(2);
+    expect(code).not.toBe(ExitCode.Success);
+    expect(writer.stderrText()).toContain('user_a');
+    expect(writer.stderrText()).toContain('✓');
+  });
+
+  it('bundles once per toolkit however many recipients there are', async () => {
+    // The bundle is a pure function of the source. Rebuilding per account would
+    // only cost time and risk two accounts getting different bytes.
+    let bundles = 0;
+    const mock = mockFetch({ data: { adminDeployServer: ok('v1') } });
+    const ctx = buildContext({
+      globals: {},
+      writer,
+      fetchImpl: mock.fetch,
+      isTTY: false,
+      configEnv: { home: home.home, env: { TROVE_TOKEN: 'tok', NO_COLOR: '1' } },
+    });
+    await mcp.deploy(
+      ctx,
+      parseArgs(
+        ['--dir', home.home, '--for', 'a', '--for', 'b', '--for', 'c'],
+        mcp.flagSpecs.deploy,
+      ),
+      {
+        bundle: async () => {
+          bundles += 1;
+          return { bundle: 'CODE', tools: [] };
+        },
+      },
+    );
+    expect(bundles).toBe(1);
+    expect(mock.calls).toHaveLength(3);
+  });
+});

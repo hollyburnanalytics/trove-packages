@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { CommandContext } from '../context.js';
 import { ExitCode, usageError } from '../errors.js';
-import { flag, type ParsedArgs } from '../lib/args.js';
+import { flag, flagList, type ParsedArgs } from '../lib/args.js';
 import { bundleServer, type ServerBundle } from '../lib/bundle.js';
 import * as ops from '../operations.js';
 import { renderJson, renderTable } from '../output.js';
@@ -93,50 +93,164 @@ function resolveNameAndSlug(
   return { name, slug };
 }
 
+/** One cell of a batch deploy: one toolkit into one account. */
+interface DeployOutcome {
+  /** The toolkit slug. */
+  slug: string;
+  /** Whose account — `null` for the caller's own. */
+  recipient: string | null;
+  /** The deployed version, when it landed. */
+  version?: string;
+  /** The deployment status the server reported. */
+  status?: string;
+  /** Why it did not, when it did not. */
+  error?: string;
+  /** The tools it serves, for the single-deploy summary. */
+  tools?: Array<{ name: string }>;
+}
+
+/**
+ * Deploy one already-bundled toolkit into one account.
+ *
+ * Split out so the batch loop has exactly one thing to call and exactly one
+ * place where a failure becomes a recorded outcome rather than an exception —
+ * a throw here would abandon the remaining cells, which is the behaviour that
+ * makes a partial batch impossible to reason about.
+ *
+ * @param ctx - The command context.
+ * @param manifest - The enriched manifest (bundle + tools already attached).
+ * @param names - The resolved display name and slug.
+ * @param recipient - The tenant to deploy into, or `null` for the caller.
+ * @returns What happened, success or failure.
+ */
+async function deployOne(
+  ctx: CommandContext,
+  manifest: Record<string, unknown>,
+  names: { name: string; slug: string },
+  recipient: string | null,
+): Promise<DeployOutcome> {
+  try {
+    if (recipient === null) {
+      const data = await ctx.client().request<{
+        deployServer: { version: string; status: string; tools: Array<{ name: string }> };
+      }>({
+        query: ops.DEPLOY_SERVER,
+        operationName: 'CliDeployServer',
+        variables: { name: names.name, slug: names.slug, manifest },
+      });
+      return {
+        slug: names.slug,
+        recipient,
+        version: data.deployServer.version,
+        status: data.deployServer.status,
+        tools: data.deployServer.tools,
+      };
+    }
+    const data = await ctx.client().request<{
+      adminDeployServer: { version: string; status: string; tools: Array<{ name: string }> };
+    }>({
+      query: ops.ADMIN_DEPLOY_SERVER,
+      operationName: 'CliAdminDeployServer',
+      variables: { clerkUserId: recipient, name: names.name, slug: names.slug, manifest },
+    });
+    return {
+      slug: names.slug,
+      recipient,
+      version: data.adminDeployServer.version,
+      status: data.adminDeployServer.status,
+      tools: data.adminDeployServer.tools,
+    };
+  } catch (err) {
+    return { slug: names.slug, recipient, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * `trove mcp deploy` (alias `trove deploy`) → `mutation deployServer`.
+ *
+ * Repeatable `--dir` and `--for` make this N toolkits × M accounts. `--for`
+ * names a recipient and is admin-only, enforced by the server rather than here
+ * — a CLI that decided who may deploy where would be a CLI you could edit.
+ *
+ * Every cell reports, and one failure does not stop the rest: a batch that
+ * abandoned the remaining work on the first error would leave the operator
+ * guessing which of twelve deploys had happened. The exit code is non-zero if
+ * ANY cell failed, so a scripted caller cannot read a partial success as a
+ * whole one.
+ *
+ * @param ctx - The command context.
+ * @param args - Parsed CLI arguments.
+ * @param deps - Injection points, so tests run without the Bun bundler.
+ * @returns The process exit code.
+ */
 export async function deploy(
   ctx: CommandContext,
   args: ParsedArgs,
   deps: McpDeployDeps = {},
 ): Promise<number> {
-  const dir = flag(args, 'dir') ?? '.';
-  const manifestPath = join(dir, 'manifest.json');
-  if (!existsSync(manifestPath)) {
-    throw usageError(`No manifest.json in '${dir}'. Run 'trove mcp init <name>' first.`);
-  }
-  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>;
-  const { name, slug } = resolveNameAndSlug(args, manifest);
+  const dirs = flagList(args, 'dir');
+  const targets = dirs.length > 0 ? dirs : ['.'];
+  // No `--for` means the caller's own account, which is the ordinary case and
+  // stays spelled exactly as it was.
+  const recipients: (string | null)[] = flagList(args, 'for');
+  const accounts = recipients.length > 0 ? recipients : [null];
 
-  const serverEntry = join(dir, 'server.ts');
-  if (!existsSync(serverEntry)) {
-    throw usageError(`No server.ts in '${dir}'. Run 'trove mcp init <name>' first.`);
-  }
-  ctx.writer.err(ctx.style.dim(`Bundling ${serverEntry}…`));
+  const outcomes: DeployOutcome[] = [];
+  for (const dir of targets) {
+    const manifestPath = join(dir, 'manifest.json');
+    if (!existsSync(manifestPath)) {
+      throw usageError(`No manifest.json in '${dir}'. Run 'trove mcp init <name>' first.`);
+    }
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>;
+    const { name, slug } = resolveNameAndSlug(args, manifest);
 
-  // Bundle the server into a deployable bundle and extract its tools, then carry
-  // both in the manifest: `bundle` is what Trove uploads to the hosted runtime;
-  // `tools` is cached so tools/list needs no sandboxed run.
-  const bundleImpl = deps.bundle ?? bundleServer;
-  const { bundle, tools } = await bundleImpl(serverEntry);
-  const enriched = { ...manifest, bundle, tools };
+    const serverEntry = join(dir, 'server.ts');
+    if (!existsSync(serverEntry)) {
+      throw usageError(`No server.ts in '${dir}'. Run 'trove mcp init <name>' first.`);
+    }
+    ctx.writer.err(ctx.style.dim(`Bundling ${serverEntry}…`));
 
-  const data = await ctx.client().request<{
-    deployServer: { id: string; version: string; status: string; tools: Array<{ name: string }> };
-  }>({
-    query: ops.DEPLOY_SERVER,
-    operationName: 'CliDeployServer',
-    variables: { name, slug, manifest: enriched },
-  });
+    // Bundled ONCE per toolkit and reused for every recipient: the bundle is a
+    // pure function of the source, so rebuilding per account would only add
+    // time and the chance that two accounts get different bytes.
+    const bundleImpl = deps.bundle ?? bundleServer;
+    const { bundle, tools } = await bundleImpl(serverEntry);
+    const enriched = { ...manifest, bundle, tools };
 
-  const dep = data.deployServer;
-  if (ctx.output.format !== 'human') {
-    ctx.writer.out(renderJson(dep, ctx.output.format));
-  } else {
-    ctx.writer.err(ctx.style.green(`✓ deployed ${slug} (version ${dep.version}, ${dep.status})`));
-    for (const tool of dep.tools) {
-      ctx.writer.out(`${slug}__${tool.name}`);
+    for (const recipient of accounts) {
+      outcomes.push(await deployOne(ctx, enriched, { name, slug }, recipient));
     }
   }
-  return ExitCode.Success;
+
+  const single = outcomes.length === 1 ? outcomes[0] : undefined;
+  if (ctx.output.format !== 'human') {
+    // One deploy still serializes as the deployment it always did; only a batch
+    // becomes a list, so a script reading `.version` off a single deploy keeps
+    // working.
+    ctx.writer.out(renderJson(single !== undefined ? single : outcomes, ctx.output.format));
+  } else if (single !== undefined && single.error === undefined) {
+    // The ordinary case, unchanged: the namespaced tool names are what you type
+    // in a client, so they stay the useful half of a successful single deploy.
+    ctx.writer.err(
+      ctx.style.green(`✓ deployed ${single.slug} (version ${single.version}, ${single.status})`),
+    );
+    for (const tool of single.tools ?? []) {
+      ctx.writer.out(`${single.slug}__${tool.name}`);
+    }
+  } else {
+    for (const o of outcomes) {
+      const who = o.recipient === null ? '' : ` → ${o.recipient}`;
+      if (o.error === undefined) {
+        ctx.writer.err(ctx.style.green(`✓ ${o.slug}${who} (version ${o.version ?? '?'})`));
+      } else {
+        ctx.writer.err(ctx.style.yellow(`✗ ${o.slug}${who}: ${o.error}`));
+      }
+    }
+  }
+
+  // Non-zero if ANY cell failed. Reporting the failures and exiting 0 would be
+  // the same as not reporting them to anything that reads exit codes.
+  return outcomes.some((o) => o.error !== undefined) ? ExitCode.Conflict : ExitCode.Success;
 }
 
 /** `trove mcp pause <server>` → `mutation pauseServer`. */
@@ -288,6 +402,6 @@ export async function secretLs(ctx: CommandContext, args: ParsedArgs): Promise<n
 
 /** Flag specs for the mcp/secret commands. */
 export const flagSpecs = {
-  deploy: { value: ['dir', 'name', 'slug'] },
+  deploy: { value: ['dir', 'name', 'slug', 'for'] },
   secretSet: { value: ['value', 'from-file'], boolean: ['from-stdin'] },
 };

@@ -1,6 +1,6 @@
 {
   "name": "@ontrove/mcp",
-  "version": "0.10.1",
+  "version": "0.11.0",
   "description": "Thin standard library for authoring your own Trove toolkits (each a hosted MCP server) — defineMcpServer, the ctx capability object, and ToolError.",
   "type": "module",
   "license": "MIT",

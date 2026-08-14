@@ -4,7 +4,11 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ES2022", "DOM"],
-    "types": [],
+    // The unit tests run under Node (they spawn a real `node` to import the
+    // BUILT package), so the dev config needs its globals. tsconfig.build.json
+    // still compiles src alone, so nothing Node-shaped can reach the published
+    // output through this.
+    "types": ["node"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,

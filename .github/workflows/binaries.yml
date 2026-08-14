@@ -97,7 +97,21 @@ jobs:
           security list-keychains -d user -s "$KEYCHAIN"
           security set-key-partition-list -S apple-tool:,apple: -s -k pw "$KEYCHAIN" >/dev/null
           for bin in dist/bin/trove-darwin-arm64 dist/bin/trove-darwin-x64; do
+            # --entitlements is not optional for a Bun binary. JavaScriptCore
+            # compiles JS to machine code at run time and needs executable
+            # memory; `--options runtime` forbids that by default. Without the
+            # entitlements the binary is signed, notarized, the right
+            # architecture, and dies on every invocation with "Ran out of
+            # executable memory while allocating 128 bytes" — which reads like a
+            # machine problem and is a signing one. 0.10.2 shipped exactly that.
+            #
+            # packaging/trove.entitlements carries NO XML comments, deliberately.
+            # Apple's entitlements parser rejects a comment anywhere in the file
+            # — `plutil -lint` calls the same file valid — and codesign then
+            # signs with no entitlements at all. A fix that looks applied,
+            # verifies clean, and changes nothing.
             codesign --force --options runtime --timestamp \
+              --entitlements packaging/trove.entitlements \
               --sign "$APPLE_SIGN_IDENTITY" "$bin"
             # Notarize (zip → submit → the binary is stapled implicitly via Gatekeeper
             # ticket lookup; standalone binaries can't be stapled, so notarization

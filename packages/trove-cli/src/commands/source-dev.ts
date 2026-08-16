@@ -363,7 +363,29 @@ function requireEgress(manifest: Record<string, unknown>, manifestPath: string):
 }
 
 /**
- * `trove source deploy [path]` — bundle `index.ts` with the runtime shim and
+ * The adapter's entry file: `index.ts`, or `index.mjs`.
+ *
+ * `source init` scaffolds TypeScript, so that is looked for first — but a
+ * source catalogue written in plain ESM is equally valid, and esbuild bundles
+ * either without caring. Accepting only `.ts` meant `trove source deploy` could
+ * not deploy a single source in the catalogue it exists to serve: all of them
+ * are `.mjs`, including ones already running in production, which had to be
+ * deployed some other way.
+ *
+ * @param dir - The source directory.
+ * @returns The entry file path.
+ * @throws When neither name is present.
+ */
+function sourceEntry(dir: string): string {
+  for (const name of ['index.ts', 'index.mjs']) {
+    const candidate = join(dir, name);
+    if (existsSync(candidate)) return candidate;
+  }
+  throw usageError(`No index.ts or index.mjs in '${dir}'. Run 'trove source init <name>' first.`);
+}
+
+/**
+ * `trove source deploy [path]` — bundle the adapter with the runtime shim and
  * hand it to `mutation deploySource`, so the source runs on Trove's schedule
  * instead of only while the author's machine is awake.
  *
@@ -388,10 +410,7 @@ export async function deploy(
   if (slug === undefined || slug === '') {
     throw usageError("manifest.json needs a string 'id' to name the deployment (or pass --slug).");
   }
-  const entry = join(dir, 'index.ts');
-  if (!existsSync(entry)) {
-    throw usageError(`No index.ts in '${dir}'. Run 'trove source init <name>' first.`);
-  }
+  const entry = sourceEntry(dir);
 
   ctx.writer.err(ctx.style.dim(`Bundling ${entry}…`));
   const bundle = await (deps.bundle ?? bundleSource)(entry);

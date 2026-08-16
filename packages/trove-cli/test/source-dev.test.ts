@@ -881,6 +881,48 @@ describe('source deploy', () => {
     });
   });
 
+  it('deploys an index.mjs source, which is what the catalogue is written in', async () => {
+    // This looked for `index.ts` and nothing else, so `trove source deploy`
+    // could not deploy a single source in the catalogue it exists to serve —
+    // every one is plain ESM, including ones already running in production,
+    // which had to be deployed some other way. esbuild bundles either.
+    rmSync(join(dir, 'index.ts'));
+    writeFileSync(join(dir, 'index.mjs'), '// source');
+    writeManifest();
+    const entries: string[] = [];
+    const code = await sourceDev.deploy(
+      ctxFor(mockFetch(deployResponse('LIVE')), writer, dir),
+      parseArgs([dir], { value: ['slug'] }),
+      bundlerFor(entries),
+    );
+    expect(code).toBe(ExitCode.Success);
+    expect(entries).toEqual([join(dir, 'index.mjs')]);
+  });
+
+  it('prefers index.ts when both are present, since that is what init scaffolds', async () => {
+    writeFileSync(join(dir, 'index.mjs'), '// source');
+    writeManifest();
+    const entries: string[] = [];
+    await sourceDev.deploy(
+      ctxFor(mockFetch(deployResponse('LIVE')), writer, dir),
+      parseArgs([dir], { value: ['slug'] }),
+      bundlerFor(entries),
+    );
+    expect(entries).toEqual([join(dir, 'index.ts')]);
+  });
+
+  it('names both filenames when neither is there', async () => {
+    rmSync(join(dir, 'index.ts'));
+    writeManifest();
+    await expect(
+      sourceDev.deploy(
+        ctxFor(mockFetch(deployResponse('LIVE')), writer, dir),
+        parseArgs([dir], { value: ['slug'] }),
+        {},
+      ),
+    ).rejects.toThrow(/index\.ts or index\.mjs/);
+  });
+
   it('refuses a manifest with no egress, naming the file', async () => {
     writeManifest({ egress: undefined });
     const mock = mockFetch(deployResponse('LIVE'));

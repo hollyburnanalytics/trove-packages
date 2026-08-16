@@ -27,7 +27,7 @@ import { usageError } from '../errors.js';
  * nothing else, which is how the catalogue is written, so a type that admitted
  * only `default` described a narrower world than the one the loaders serve.
  */
-export interface ModuleNamespace {
+interface ModuleNamespace {
   /** The default export, when the module has one. */
   default?: unknown;
   /** Any named export — read structurally by the source loaders. */
@@ -157,8 +157,8 @@ async function defaultBundleSourceForDeploy(entry: string): Promise<string> {
     wrapper,
     // A NAMESPACE import, not a default one: a bare `export async function
     // sync(ctx)` is a complete adapter and is how the catalogue is written, so
-    // a default import would bundle `undefined` and the isolate would 500 on
-    // its first invoke rather than fail here. `createSourceWorker` normalises
+    // a default import would bundle `undefined` and the hosted runtime would 500
+    // on its first invoke rather than fail here. `createSourceWorker` normalises
     // a bare function to `{ sync }` itself.
     `import * as source from ${JSON.stringify(resolve(entry))};\n` +
       `import { createSourceWorker } from '@ontrove/source-runtime';\n` +

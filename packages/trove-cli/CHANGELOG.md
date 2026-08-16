@@ -1,5 +1,30 @@
 # @ontrove/cli
 
+## 0.10.4
+
+### Patch Changes
+
+- c3c5e93: `trove source deploy` accepts `index.mjs`, not only `index.ts`.
+
+  It looked for a single hardcoded filename, so it could not deploy any source
+  in the catalogue it exists to serve — every one is plain ESM, including ones
+  already running in production, which had to be deployed some other way.
+  esbuild bundles either. `index.ts` still wins when both are present, since
+  that is what `source init` scaffolds.
+
+- feda9a5: `trove source` accepts a bare `export async function sync(ctx)`.
+
+  The source commands required `export default defineSource({ sync })` and
+  rejected everything else — which is every source in the catalogue, including
+  adapters already syncing in production. A source's whole contract is one
+  `sync(ctx)` function, and `createSourceWorker` already normalises a bare
+  function to `{ sync }`, so the wrapper was never load-bearing at the runtime
+  end. `run`/`test`/`sync` also only looked for `index.ts`, so they could not
+  open a `.mjs` project either.
+
+  - @ontrove/sdk@0.10.4
+  - @ontrove/mcp@0.10.4
+
 ## 0.10.3
 
 ### Patch Changes

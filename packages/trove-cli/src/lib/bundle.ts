@@ -141,9 +141,14 @@ async function defaultBundleSourceForDeploy(entry: string): Promise<string> {
   // a relative specifier would resolve against that dir, not the project.
   writeFileSync(
     wrapper,
-    `import source from ${JSON.stringify(resolve(entry))};\n` +
+    // A NAMESPACE import, not a default one: a bare `export async function
+    // sync(ctx)` is a complete adapter and is how the catalogue is written, so
+    // a default import would bundle `undefined` and the isolate would 500 on
+    // its first invoke rather than fail here. `createSourceWorker` normalises
+    // a bare function to `{ sync }` itself.
+    `import * as source from ${JSON.stringify(resolve(entry))};\n` +
       `import { createSourceWorker } from '@ontrove/source-runtime';\n` +
-      `export default createSourceWorker(source);\n`,
+      `export default createSourceWorker(source.default ?? source.sync);\n`,
   );
   try {
     const result = await Bun.build({
@@ -204,6 +209,40 @@ export async function loadModule<T = unknown>(
     throw usageError(`${entry} has no default export.`);
   }
   return mod.default as T;
+}
+
+/**
+ * Load a SOURCE entry, accepting either export shape an adapter is written in.
+ *
+ * `defineSource({ sync })` as a default export is what `source init` scaffolds,
+ * and it is what {@link loadModule} demands. But a source's whole contract is
+ * one `sync(ctx)` function, so a bare `export async function sync(ctx)` is a
+ * complete adapter and needs no wrapper — which is how every source in the
+ * catalogue is in fact written. Requiring the wrapper made the source commands
+ * reject the entire corpus they exist to serve, including adapters already
+ * running in production.
+ *
+ * A named `sync` is normalised to `{ sync }` here, exactly as
+ * `createSourceWorker` already does at the other end of the pipe, so
+ * everything downstream sees one shape.
+ *
+ * @param entry - Absolute path to the `.ts`/`.mjs` entry file.
+ * @param options - Injection points for tests.
+ * @returns The source object.
+ * @throws {@link CliError} (usage) when the entry exports neither shape.
+ */
+export async function loadSourceModule<T = unknown>(
+  entry: string,
+  options: LoadModuleOptions = {},
+): Promise<T> {
+  const load = options.loadImpl ?? defaultLoad;
+  const mod = (await load(entry)) as { default?: unknown; sync?: unknown };
+  if (mod.default !== undefined && mod.default !== null) return mod.default as T;
+  if (typeof mod.sync === 'function') return { sync: mod.sync } as T;
+  throw usageError(
+    `${entry} exports neither a default source nor a \`sync\` function. ` +
+      'A source is either `export default defineSource({ sync })` or `export async function sync(ctx)`.',
+  );
 }
 
 /** A cached tool descriptor extracted from a bundled server's `tools/list`. */

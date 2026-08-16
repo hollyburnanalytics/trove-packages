@@ -3,7 +3,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CliError, ExitCode } from '../src/errors.js';
-import { bundleServer, bundleSource, loadModule, writeNew } from '../src/lib/bundle.js';
+import {
+  bundleServer,
+  bundleSource,
+  loadModule,
+  loadSourceModule,
+  writeNew,
+} from '../src/lib/bundle.js';
 
 /**
  * These unit tests inject the loader/bundler seams so they run under the
@@ -168,5 +174,32 @@ describe('loadModule', () => {
     await expect(loadModule('/x/index.ts', { loadImpl: async () => ({}) })).rejects.toThrow(
       /no default export/,
     );
+  });
+});
+
+describe('loadSourceModule', () => {
+  it('accepts a bare `export async function sync`, which is how sources are written', async () => {
+    // Requiring `export default defineSource(...)` rejected every source in the
+    // catalogue — all 21 of them export a named `sync` and nothing else,
+    // including adapters already syncing in production. A source's whole
+    // contract is one function, so the wrapper was never load-bearing.
+    const sync = async (): Promise<{ documents: [] }> => ({ documents: [] });
+    const source = await loadSourceModule<{ sync: unknown }>('/x/index.mjs', {
+      loadImpl: async () => ({ sync }),
+    });
+    expect(source.sync).toBe(sync);
+  });
+
+  it('prefers the default export when the entry has one', async () => {
+    const source = await loadSourceModule<{ tag: string }>('/x/index.ts', {
+      loadImpl: async () => ({ default: { tag: 'wrapped' }, sync: () => undefined }),
+    });
+    expect(source.tag).toBe('wrapped');
+  });
+
+  it('names both shapes when the entry exports neither', async () => {
+    await expect(
+      loadSourceModule('/x/index.mjs', { loadImpl: async () => ({ notASource: 1 }) }),
+    ).rejects.toThrow(/neither a default source nor a `sync` function/);
   });
 });

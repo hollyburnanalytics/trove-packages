@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { basename, isAbsolute, join, resolve } from 'node:path';
 import { runSource, type SourceDocument, validateSourceManifest } from '@ontrove/sdk';
 import type { CommandContext } from '../context.js';
@@ -24,6 +24,7 @@ import {
   readManifest,
   resolveTarget,
   type SourceDevDeps,
+  sourceEntry,
 } from './source-dev-project.js';
 
 /**
@@ -360,28 +361,6 @@ function requireEgress(manifest: Record<string, unknown>, manifestPath: string):
     throw usageError(`${manifestPath}: every \`egress\` entry must be a non-empty hostname.`);
   }
   return hosts;
-}
-
-/**
- * The adapter's entry file: `index.ts`, or `index.mjs`.
- *
- * `source init` scaffolds TypeScript, so that is looked for first — but a
- * source catalogue written in plain ESM is equally valid, and esbuild bundles
- * either without caring. Accepting only `.ts` meant `trove source deploy` could
- * not deploy a single source in the catalogue it exists to serve: all of them
- * are `.mjs`, including ones already running in production, which had to be
- * deployed some other way.
- *
- * @param dir - The source directory.
- * @returns The entry file path.
- * @throws When neither name is present.
- */
-function sourceEntry(dir: string): string {
-  for (const name of ['index.ts', 'index.mjs']) {
-    const candidate = join(dir, name);
-    if (existsSync(candidate)) return candidate;
-  }
-  throw usageError(`No index.ts or index.mjs in '${dir}'. Run 'trove source init <name>' first.`);
 }
 
 /**

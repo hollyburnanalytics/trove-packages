@@ -4,7 +4,7 @@ import type { SourceDocument, TroveSource, Watermark } from '@ontrove/sdk';
 import type { CommandContext } from '../context.js';
 import { CliError, ExitCode, usageError } from '../errors.js';
 import { flag, type ParsedArgs } from '../lib/args.js';
-import { type LoadModuleOptions, loadModule } from '../lib/bundle.js';
+import { type LoadModuleOptions, loadSourceModule } from '../lib/bundle.js';
 import { parseCursor } from '../lib/source.js';
 import * as ops from '../operations.js';
 
@@ -42,20 +42,42 @@ export function readManifest(dir: string): Record<string, unknown> {
   }
 }
 
-/** Load the source's default export from `index.ts` in a project dir. */
-export async function loadSource(dir: string, deps: SourceDevDeps): Promise<TroveSource> {
-  const entry = join(dir, 'index.ts');
-  if (!existsSync(entry)) {
-    throw usageError(`No index.ts in '${dir}'. Run 'trove source init <name>' first.`);
+/**
+ * The entry file of a source project.
+ *
+ * TypeScript wins when both exist, because that is what `source init`
+ * scaffolds. `.mjs` is not a fallback for its own sake: a source is plain ESM
+ * with no types of its own to speak of, and every source in the catalogue is
+ * written that way — so a command that only knew `index.ts` could not open a
+ * single real source, and said "run `trove source init` first" about a project
+ * that was already complete.
+ *
+ * @param dir - The source project directory.
+ * @returns Absolute path to the entry file.
+ * @throws {@link CliError} (usage) when the directory holds neither.
+ */
+export function sourceEntry(dir: string): string {
+  for (const name of ['index.ts', 'index.mjs']) {
+    const candidate = join(dir, name);
+    if (existsSync(candidate)) return candidate;
   }
-  const load = deps.load ?? loadModule;
+  throw usageError(`No index.ts or index.mjs in '${dir}'. Run 'trove source init <name>' first.`);
+}
+
+/** Load the source from a project dir, in either shape an adapter may be written in. */
+export async function loadSource(dir: string, deps: SourceDevDeps): Promise<TroveSource> {
+  const entry = sourceEntry(dir);
+  const load = deps.load ?? loadSourceModule;
   const source = await load<TroveSource>(entry);
   if (
     source === null ||
     typeof source !== 'object' ||
     typeof (source as { sync?: unknown }).sync !== 'function'
   ) {
-    throw usageError(`${entry} default export is not a source (expected defineSource(...)).`);
+    throw usageError(
+      `${entry} is not a source: it must export a \`sync(ctx)\` function, ` +
+        'either directly or as `export default defineSource({ sync })`.',
+    );
   }
   return source;
 }

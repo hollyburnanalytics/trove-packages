@@ -96,3 +96,27 @@ export function tempHome(): TempHome {
     cleanup: () => rmSync(home, { recursive: true, force: true }),
   };
 }
+
+/**
+ * Assert a value is there, and return it.
+ *
+ * For reaching into recorded mock calls. `(present(mock.calls[0]).variables as T).x`
+ * reads as defensive and is the opposite: the cast forces parentheses, which
+ * END the optional chain, so an absent call throws at `.x` rather than
+ * short-circuiting — several lines from the assertion that would have named the
+ * missing call. `noUnsafeOptionalChaining` flags exactly that shape.
+ *
+ * A test reaching for the first call has already asserted it happened, so the
+ * honest form is no chain at all, plus a sentence when the assumption is wrong.
+ *
+ * @param value - The possibly-absent value.
+ * @param what - What was expected, for the message.
+ * @returns The value, narrowed.
+ * @throws When it is absent.
+ */
+export function present<T>(value: T | undefined | null, what = 'value'): T {
+  if (value === undefined || value === null) {
+    throw new Error(`expected a ${what}, got ${String(value)}`);
+  }
+  return value;
+}

@@ -6,6 +6,7 @@ import * as mcp from '../src/commands/mcp.js';
 import { buildContext } from '../src/context.js';
 import { ExitCode } from '../src/errors.js';
 import { parseArgs } from '../src/lib/args.js';
+import { present } from './helpers';
 import {
   type CapturedRequest,
   type CaptureWriter,
@@ -288,7 +289,7 @@ describe('capture + gql + query human coverage', () => {
       home,
     );
     expect(code).toBe(ExitCode.Success);
-    expect((mock.calls[0]?.variables.documents as unknown[]).length).toBe(2);
+    expect((present(mock.calls[0]).variables.documents as unknown[]).length).toBe(2);
   });
 
   it('ingest rejects an invalid JSON array file', async () => {

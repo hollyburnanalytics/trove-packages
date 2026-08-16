@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadConfig, persistToken } from '../src/config.js';
 import { buildContext } from '../src/context.js';
+import { present } from './helpers';
 import { captureWriter, type TempHome, tempHome } from './helpers.js';
 
 describe('buildContext', () => {
@@ -177,7 +178,7 @@ describe('a stored refresh token, with no access token', () => {
           headers: { 'content-type': 'application/json' },
         });
       }
-      const auth = (init?.headers as Record<string, string> | undefined)?.authorization;
+      const auth = (present(init).headers as Record<string, string> | undefined)?.authorization;
       // Unauthenticated on the first pass, satisfied once refreshed — which is
       // exactly the sequence `onAuthFailure` exists to drive.
       if (auth !== 'Bearer fresh-at') return new Response('{}', { status: 401 });

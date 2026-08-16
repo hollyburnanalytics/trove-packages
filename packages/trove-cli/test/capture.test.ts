@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { run } from '../src/cli.js';
 import { ExitCode } from '../src/errors.js';
+import { present } from './helpers';
 import {
   type CaptureWriter,
   captureWriter,
@@ -76,7 +77,7 @@ describe('ingest (CAS)', () => {
       cursor: 'cur-2',
       cursorBefore: 'cur-1',
     });
-    expect((mock.calls[0]?.variables.documents as unknown[]).length).toBe(2);
+    expect((present(mock.calls[0]).variables.documents as unknown[]).length).toBe(2);
   });
 
   it('accepts a JSON array as well as JSONL', async () => {
@@ -99,7 +100,7 @@ describe('ingest (CAS)', () => {
       writer,
       home,
     );
-    expect((mock.calls[0]?.variables.documents as unknown[]).length).toBe(1);
+    expect((present(mock.calls[0]).variables.documents as unknown[]).length).toBe(1);
   });
 
   it('maps a cursor CAS rejection to exit 8 (retryable)', async () => {

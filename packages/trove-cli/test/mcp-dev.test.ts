@@ -7,6 +7,7 @@ import * as mcpDev from '../src/commands/mcp-dev.js';
 import { buildContext } from '../src/context.js';
 import { ExitCode } from '../src/errors.js';
 import { parseArgs } from '../src/lib/args.js';
+import { present } from './helpers';
 import { type CaptureWriter, captureWriter } from './helpers.js';
 
 const server: McpServerDefinition = defineMcpServer({
@@ -171,16 +172,20 @@ describe('mcp dev', () => {
       },
     });
     const list = await captured?.fetch(new Request('http://127.0.0.1/', { method: 'GET' }));
-    expect(((await list?.json()) as { tools: Array<{ name: string }> }).tools[0]?.name).toBe(
-      'echo',
-    );
+    expect(
+      ((await present(list, 'tools/list response').json()) as { tools: Array<{ name: string }> })
+        .tools[0]?.name,
+    ).toBe('echo');
     const call = await captured?.fetch(
       new Request('http://127.0.0.1/', {
         method: 'POST',
         body: JSON.stringify({ tool: 'echo', args: { message: 'hi' } }),
       }),
     );
-    expect(((await call?.json()) as { result: { text: string } }).result.text).toBe('hi');
+    expect(
+      ((await present(call, 'tools/call response').json()) as { result: { text: string } }).result
+        .text,
+    ).toBe('hi');
   });
 });
 

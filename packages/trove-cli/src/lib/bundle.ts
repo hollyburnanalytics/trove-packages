@@ -20,6 +20,20 @@ import { usageError } from '../errors.js';
  * @module
  */
 
+/**
+ * A loaded module's namespace.
+ *
+ * Deliberately open past `default`: a source may export its `sync` by name and
+ * nothing else, which is how the catalogue is written, so a type that admitted
+ * only `default` described a narrower world than the one the loaders serve.
+ */
+export interface ModuleNamespace {
+  /** The default export, when the module has one. */
+  default?: unknown;
+  /** Any named export — read structurally by the source loaders. */
+  [name: string]: unknown;
+}
+
 /** Options for {@link loadModule}/{@link bundleServer} (injection points for tests). */
 export interface LoadModuleOptions {
   /**
@@ -27,7 +41,7 @@ export interface LoadModuleOptions {
    * Injected so the Node-instrumented unit suite runs without the Bun loader;
    * defaults to the Bun loader (exercised by the Bun smoke test).
    */
-  loadImpl?: (entry: string) => Promise<{ default?: unknown }>;
+  loadImpl?: (entry: string) => Promise<ModuleNamespace>;
   /**
    * Produce the deployable hosted-runtime bundle text for a server entry.
    * Injected in tests; defaults to the Bun deploy bundler.
@@ -64,10 +78,10 @@ function registerEmbeddedResolver(): void {
  * the entry directly — Bun transpiles the TypeScript. The URL is cache-busted so
  * repeated loads (e.g. `dev` reruns) re-import fresh code.
  */
-async function defaultLoad(entry: string): Promise<{ default?: unknown }> {
+async function defaultLoad(entry: string): Promise<ModuleNamespace> {
   registerEmbeddedResolver();
   const url = `${pathToFileURL(resolve(entry)).href}?t=${String(Date.now())}`;
-  return (await import(/* @vite-ignore */ url)) as { default?: unknown };
+  return (await import(/* @vite-ignore */ url)) as ModuleNamespace;
 }
 
 /**
@@ -363,9 +377,12 @@ export async function bundleSource(
   entry: string,
   options: LoadModuleOptions = {},
 ): Promise<string> {
-  const source = await loadModule<{ sync?: unknown }>(entry, options);
+  const source = await loadSourceModule<{ sync?: unknown }>(entry, options);
   if (typeof source.sync !== 'function') {
-    throw usageError(`${entry} default export is not a source (expected defineSource(...)).`);
+    throw usageError(
+      `${entry} is not a source: it must export a \`sync(ctx)\` function, ` +
+        'either directly or as `export default defineSource({ sync })`.',
+    );
   }
   const bundleFor = options.bundleImpl ?? defaultBundleSourceForDeploy;
   return await bundleFor(entry);

@@ -97,6 +97,17 @@ describe('bundleSource', () => {
     expect(bundled).toEqual(['/proj/index.ts']);
   });
 
+  it('bundles an entry that exports a bare named `sync`', async () => {
+    // The third place that demanded a default export, and the one on the deploy
+    // path: `source deploy` bundles through here, so fixing the two loaders
+    // above still left every catalogue source undeployable.
+    const bundle = await bundleSource('/proj/index.mjs', {
+      loadImpl: async () => ({ sync: async () => [] }),
+      bundleImpl: async () => 'BUNDLE',
+    });
+    expect(bundle).toBe('BUNDLE');
+  });
+
   it('refuses an entry whose default export is not a source', async () => {
     // Caught here rather than by the sandbox on its first sync, which is hours
     // later and somewhere the author cannot see.
@@ -199,7 +210,7 @@ describe('loadSourceModule', () => {
 
   it('names both shapes when the entry exports neither', async () => {
     await expect(
-      loadSourceModule('/x/index.mjs', { loadImpl: async () => ({ notASource: 1 }) }),
+      loadSourceModule('/x/index.mjs', { loadImpl: async () => ({ default: undefined }) }),
     ).rejects.toThrow(/neither a default source nor a `sync` function/);
   });
 });

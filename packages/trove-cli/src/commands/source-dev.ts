@@ -62,15 +62,26 @@ export async function init(ctx: CommandContext, args: ParsedArgs): Promise<numbe
     .toLowerCase()
     .replace(/[^a-z0-9-]+/g, '-')
     .replace(/^-+|-+$/g, '');
+  // Every field here is one the taxonomy actually defines, and the whole object
+  // passes `trove source validate` as written. It did not before: `kind` held a
+  // transport ('feed'), `transport` held a value that is not one ('http'),
+  // `document_semantics` was both the former name and a value from no
+  // vocabulary ('text'), and `watermark` and `location` were absent entirely.
+  // Nothing objected, because the validator did not yet know the vocabulary —
+  // so a new author's first two commands succeeded and their first deploy did
+  // not.
   const manifest = {
     id: id || 'my-source',
     name: basename(name),
     version: '1.0.0',
     description: `The ${basename(name)} source.`,
+    kind: 'scheduled-sync',
+    transport: 'feed',
+    watermark: 'date',
+    documentSemantics: 'append',
+    location: 'cloud',
     schedule: 'every 6 hours',
-    kind: 'feed',
-    transport: 'http',
-    document_semantics: 'text',
+    needs_browser: false,
     config: {
       feedUrl: { label: 'Feed URL', type: 'url', placeholder: 'https://example.com/feed.xml' },
     },

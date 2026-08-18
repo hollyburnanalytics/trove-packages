@@ -150,12 +150,22 @@ function installRedirectPolicy(): void {
  * @param raw - Whatever was stored as this feed's cursor.
  * @returns The watermark to hand the adapter.
  */
-export function toWatermark(raw: unknown): Watermark {
-  if (typeof raw === 'string' && raw !== '') return { type: 'date', value: raw };
-  if (raw === null || typeof raw !== 'object') return { type: 'none' };
-  const type = (raw as { type?: unknown }).type;
-  if (type === 'date' || type === 'idSet' || type === 'none') return raw as Watermark;
-  return { type: 'none' };
+export function toCursor(raw: unknown): Watermark | undefined {
+  // Absent, and stays absent. `{ type: 'none' }` is the shape a source RETURNS
+  // to mean "no new position"; it is not what an adapter is handed on a first
+  // run, which tests `if (!ctx.cursor)`.
+  if (raw === null || raw === undefined) return undefined;
+  // The legacy form: a bare ISO string, from before the cursor was tagged.
+  if (typeof raw === 'string') return raw === '' ? undefined : { type: 'date', value: raw };
+  if (typeof raw !== 'object') return undefined;
+  // Anything else is handed back UNCHANGED, including shapes this union does
+  // not name. Trove stores a cursor as opaque JSON and returns exactly what the
+  // source wrote, and the contract case "config, credentials and cursor reach
+  // the adapter unchanged" says so with a `{ sinceId }` fixture — a real
+  // source's shape, because a source that resumes from a post id is a source
+  // this reshaped into `{ type: 'none' }` on every run. Its watermark never
+  // advanced and its metered API was re-read from the top forever, silently.
+  return raw as Watermark;
 }
 
 /**
@@ -213,9 +223,13 @@ export async function handleInvoke(
   body: SourceInvokeBody,
   logs: string[],
 ): Promise<SourceInvokeResult> {
+  const cursor = toCursor(body.cursor);
   const result = await runSource(source, {
     config: body.config ?? {},
-    cursor: toWatermark(body.cursor),
+    // Resolved once and spread, not assigned: an absent cursor must not become a
+    // present one, and `exactOptionalPropertyTypes` will not accept `undefined`
+    // where the property is optional.
+    ...(cursor === undefined ? {} : { cursor }),
     // Both of these used to be refusals. This shim was written when the SDK
     // spine had neither, and it said so in two error messages — one telling an
     // author with a credential to "run it from the Mac app", the other calling

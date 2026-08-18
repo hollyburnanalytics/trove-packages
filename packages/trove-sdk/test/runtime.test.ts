@@ -199,14 +199,32 @@ describe('runSource — cursor passthrough', () => {
     expect(result.cursor).toEqual({ type: 'date', value: '2026-06-14T00:00:00Z' });
   });
 
-  it('defaults ctx.cursor to none on the first sync', async () => {
+  it('leaves ctx.cursor absent on the first sync', async () => {
+    // This asserted `{ type: 'none' }` and was wrong in a way only production
+    // could show: Trove's runtime passes `undefined`, the invoke contract says
+    // "a wire null cursor becomes undefined", and every adapter tests
+    // `if (!ctx.cursor)`. A first run that arrives holding an object is a first
+    // run that looks like a resume.
     const source = defineSource({
       async sync(ctx) {
-        expect(ctx.cursor).toEqual({ type: 'none' });
+        expect(ctx.cursor).toBeUndefined();
         return [{ id: 'a', title: 'Doc a', text: 'x' }];
       },
     });
     await runSource(source);
+  });
+
+  it('hands back a cursor shape the Watermark union does not name', async () => {
+    // Trove stores a cursor as opaque JSON and returns exactly what was
+    // written. A source resuming from a post id gets its own shape back.
+    const stored = { sinceId: '9' } as unknown as Watermark;
+    const source = defineSource({
+      async sync(ctx) {
+        expect(ctx.cursor).toEqual({ sinceId: '9' });
+        return [{ id: 'a', title: 'Doc a', text: 'x' }];
+      },
+    });
+    await runSource(source, { cursor: stored });
   });
 });
 

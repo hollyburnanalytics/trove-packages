@@ -1,11 +1,18 @@
 # @ontrove/sdk
 
-The thin standard library for authoring **Trove sources** — scheduled adapters
-that fetch content into your knowledge base. (Source authoring is an early,
-still-developing surface.) You write a `sync(ctx)` that fetches new content and returns
-documents; the SDK owns the document shape, the typed `ctx` capability object,
-the watermark/cursor model, the local-run harness the CLI drives, and manifest
-validation.
+The shared vocabulary for **Trove sources** — scheduled adapters that fetch
+content into your knowledge base. (Source authoring is an early,
+still-developing surface.) You write a `sync(ctx)` that fetches new content and
+returns documents; this package owns the shapes both ends of that call agree on:
+the invoke contract every runtime speaks, the document shape, the typed `ctx`
+capability object, the watermark/cursor model, the local-run harness the CLI
+drives, and manifest validation.
+
+What it does **not** yet own are the helpers a source is mostly written against
+— feed parsing, HTML to text, the scrape loop, the code that writes a watermark.
+Those still live alongside the sources themselves, so today the contract is
+shared and the implementation behind it is not. Moving them here is the
+direction of travel.
 
 It is symmetric with the toolkit-authoring SDK
 ([`@ontrove/mcp`](https://www.npmjs.com/package/@ontrove/mcp)) `defineMcpServer`

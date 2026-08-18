@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { isCredentialConfigKey, validateSourceManifest } from '../src/manifest.js';
+import {
+  CLOUD_ELIGIBLE_TRANSPORTS,
+  DIRECTORY_MODES,
+  DOCUMENT_SEMANTICS,
+  FAN_OUT_FIELD_TYPES,
+  FORMATTING,
+  isCredentialConfigKey,
+  LOCATIONS,
+  MVP,
+  SOURCE_KINDS,
+  SOURCE_TYPE_FIELDS,
+  TRANSPORTS,
+  VALID_SCHEDULES,
+  validateSourceManifest,
+  WATERMARK_STRATEGIES,
+} from '../src/manifest.js';
 
-/** A clean, minimal manifest fixture. */
+/** A clean, fully-declared manifest fixture — what a shipping source looks like. */
 function clean(): Record<string, unknown> {
   return {
     id: 'hacker-news',
@@ -10,36 +25,45 @@ function clean(): Record<string, unknown> {
     icon: '🔶',
     version: '1.0.0',
     author: 'matt',
-    category: 'reading',
     schedule: 'every 6 hours',
+    kind: 'scheduled-sync',
+    transport: 'api',
+    watermark: 'date',
+    documentSemantics: 'append',
+    location: 'cloud',
     config: {
       username: { label: 'HN Username', type: 'text', placeholder: 'pg' },
     },
     needs_browser: false,
-    kind: 'feed',
-    transport: 'http',
-    document_semantics: 'bookmark',
   };
+}
+
+/** Every error, joined, for substring assertions. */
+function errorsOf(manifest: unknown, options?: { implemented?: boolean }): string {
+  return validateSourceManifest(manifest, options).errors.join('\n');
 }
 
 describe('validateSourceManifest — accepts clean manifests', () => {
   it('accepts a full manifest', () => {
-    const result = validateSourceManifest(clean());
-    expect(result).toEqual({ valid: true, errors: [] });
+    expect(validateSourceManifest(clean())).toEqual({ valid: true, errors: [] });
   });
 
-  it('accepts a minimal manifest', () => {
-    const result = validateSourceManifest({
-      id: 'my-blog',
-      name: 'My Blog',
-      version: '1.0.0',
+  it('accepts a full manifest as an implemented catalog entry', () => {
+    expect(validateSourceManifest(clean(), { implemented: true })).toEqual({
+      valid: true,
+      errors: [],
     });
+  });
+
+  it('accepts a minimal manifest while authoring', () => {
+    const result = validateSourceManifest({ id: 'my-blog', name: 'My Blog', version: '1.0.0' });
     expect(result.valid).toBe(true);
   });
 
   it('accepts a live-only manifest with schedule: null', () => {
     const m = clean();
     m.schedule = null;
+    m.location = 'client';
     expect(validateSourceManifest(m).valid).toBe(true);
   });
 
@@ -93,35 +117,319 @@ describe('validateSourceManifest — shape errors', () => {
   it('rejects a bad id pattern', () => {
     const m = clean();
     m.id = 'Bad ID!';
-    expect(validateSourceManifest(m).errors.join('\n')).toMatch(/\^\[a-z0-9-\]\+\$/);
+    expect(errorsOf(m)).toMatch(/\^\[a-z0-9-\]\+\$/);
   });
 
   it('rejects a non-semver version', () => {
     const m = clean();
     m.version = 'v1';
-    expect(validateSourceManifest(m).errors.join('\n')).toMatch(/must be a semver/);
+    expect(errorsOf(m)).toMatch(/must be a semver/);
   });
 
   it('rejects a non-object config', () => {
     const m = clean();
     m.config = 'nope';
-    expect(validateSourceManifest(m).errors.join('\n')).toMatch(
-      /manifest.config must be an object/,
-    );
+    expect(errorsOf(m)).toMatch(/manifest.config must be an object/);
   });
 
   it('rejects a config field that is not a descriptor object', () => {
     const m = clean();
     m.config = { username: 'just-a-string' };
-    expect(validateSourceManifest(m).errors.join('\n')).toMatch(
-      /must be a field descriptor object/,
-    );
+    expect(errorsOf(m)).toMatch(/manifest.config.username must be a field descriptor object/);
   });
 
   it('rejects a non-boolean needs_browser', () => {
     const m = clean();
     m.needs_browser = 'yes';
-    expect(validateSourceManifest(m).errors.join('\n')).toMatch(/needs_browser must be a boolean/);
+    expect(errorsOf(m)).toMatch(/needs_browser must be a boolean/);
+  });
+});
+
+describe('validateSourceManifest — the type-system fields', () => {
+  it('names the field and the whole vocabulary on an unknown value', () => {
+    const m = clean();
+    m.transport = 'http';
+    const message = errorsOf(m);
+    expect(message).toMatch(/manifest.transport "http" is not a known transport/);
+    for (const value of TRANSPORTS) expect(message).toContain(value);
+  });
+
+  it('rejects an unknown kind, watermark and documentSemantics', () => {
+    const m = clean();
+    m.kind = 'feed';
+    m.watermark = 'whenever';
+    m.documentSemantics = 'text';
+    const message = errorsOf(m);
+    expect(message).toMatch(/manifest.kind "feed" is not a known execution kind/);
+    expect(message).toMatch(/manifest.watermark "whenever" is not a known watermark strategy/);
+    expect(message).toMatch(/manifest.documentSemantics "text" is not a known ingest behaviour/);
+  });
+
+  it('reports a non-string value as it appeared in the JSON', () => {
+    const m = clean();
+    m.kind = 3;
+    expect(errorsOf(m)).toMatch(/manifest.kind 3 is not a known execution kind/);
+  });
+
+  it('lets a stub declare a reserved value it has not built yet', () => {
+    const m = clean();
+    m.watermark = 'opaqueToken';
+    m.documentSemantics = 'upsert';
+    expect(validateSourceManifest(m, { implemented: false }).valid).toBe(true);
+  });
+
+  it('holds a source with code to the values that run today', () => {
+    const m = clean();
+    m.watermark = 'opaqueToken';
+    const message = errorsOf(m, { implemented: true });
+    expect(message).toMatch(
+      /manifest.watermark "opaqueToken" is a reserved watermark strategy that nothing runs yet/,
+    );
+    for (const value of MVP.watermarks) expect(message).toContain(value);
+  });
+
+  it('requires all four declarations plus location for a catalog entry', () => {
+    const message = errorsOf({ id: 'x', name: 'X', version: '1.0.0' }, { implemented: false });
+    for (const field of Object.keys(SOURCE_TYPE_FIELDS)) {
+      expect(message).toContain(`manifest.${field} is required`);
+    }
+    expect(message).toContain('manifest.location is required');
+  });
+
+  it('does not require them while authoring', () => {
+    expect(validateSourceManifest({ id: 'x', name: 'X', version: '1.0.0' }).valid).toBe(true);
+  });
+
+  it('flags the former snake_case name so it is not silently ignored', () => {
+    const m = clean();
+    m.document_semantics = 'append';
+    expect(errorsOf(m)).toMatch(
+      /manifest.document_semantics is the former name of manifest.documentSemantics/,
+    );
+  });
+});
+
+describe('validateSourceManifest — location and cloud eligibility', () => {
+  it('rejects an unknown location', () => {
+    const m = clean();
+    m.location = 'edge';
+    expect(errorsOf(m)).toMatch(/manifest.location "edge" is not a known location/);
+  });
+
+  it('rejects a cloud source whose transport cannot run there', () => {
+    const cloudEligible: readonly string[] = CLOUD_ELIGIBLE_TRANSPORTS;
+    for (const transport of TRANSPORTS.filter((t) => !cloudEligible.includes(t))) {
+      const m = clean();
+      m.transport = transport;
+      expect(errorsOf(m)).toMatch(
+        /manifest.location "cloud" requires manifest.transport to be one of/,
+      );
+    }
+  });
+
+  it('accepts every cloud-eligible transport in the cloud', () => {
+    for (const transport of CLOUD_ELIGIBLE_TRANSPORTS) {
+      const m = clean();
+      m.transport = transport;
+      expect(validateSourceManifest(m).valid).toBe(true);
+    }
+  });
+
+  it('rejects a cloud source that needs a browser', () => {
+    const m = clean();
+    m.needs_browser = true;
+    expect(errorsOf(m)).toMatch(/incompatible with manifest.needs_browser: true/);
+  });
+
+  it('rejects a cloud source scheduled on demand', () => {
+    const m = clean();
+    m.schedule = 'on demand';
+    expect(errorsOf(m)).toMatch(/incompatible with manifest.schedule "on demand"/);
+  });
+
+  it('lets the client run anything', () => {
+    const m = clean();
+    m.location = 'client';
+    m.transport = 'browser';
+    m.needs_browser = true;
+    m.schedule = 'on demand';
+    expect(validateSourceManifest(m).valid).toBe(true);
+  });
+});
+
+describe('validateSourceManifest — schedule', () => {
+  it('accepts every documented cadence', () => {
+    for (const schedule of VALID_SCHEDULES) {
+      const m = clean();
+      m.location = 'client';
+      m.schedule = schedule;
+      expect(validateSourceManifest(m).valid).toBe(true);
+    }
+  });
+
+  it('rejects a cadence the scheduler cannot map', () => {
+    const m = clean();
+    m.schedule = 'hourly';
+    const message = errorsOf(m);
+    expect(message).toMatch(/manifest.schedule "hourly" is not a recognised cadence/);
+    expect(message).toContain('every 1 hour');
+  });
+});
+
+describe('validateSourceManifest — fanOut', () => {
+  it('accepts a fanOut naming a list field', () => {
+    for (const type of FAN_OUT_FIELD_TYPES) {
+      const m = clean();
+      m.config = { feeds: { label: 'Feeds', type } };
+      m.fanOut = 'feeds';
+      expect(validateSourceManifest(m).valid).toBe(true);
+    }
+  });
+
+  it('rejects a fanOut that is not a string', () => {
+    const m = clean();
+    m.fanOut = ['feeds'];
+    expect(errorsOf(m)).toMatch(/manifest.fanOut \["feeds"\] must be a non-empty string/);
+  });
+
+  it('rejects a fanOut naming a field that does not exist', () => {
+    const m = clean();
+    m.fanOut = 'feeds';
+    expect(errorsOf(m)).toMatch(/manifest.fanOut "feeds" does not name a field in manifest.config/);
+  });
+
+  it('rejects a fanOut naming a scalar field', () => {
+    const m = clean();
+    m.config = { feedUrl: { label: 'Feed URL', type: 'url' } };
+    m.fanOut = 'feedUrl';
+    expect(errorsOf(m)).toMatch(/manifest.config.feedUrl.type is "url"/);
+  });
+});
+
+describe('validateSourceManifest — formatting', () => {
+  it('accepts both policies and treats absence as valid', () => {
+    for (const formatting of FORMATTING) {
+      const m = clean();
+      m.formatting = formatting;
+      expect(validateSourceManifest(m).valid).toBe(true);
+    }
+    expect(validateSourceManifest(clean()).valid).toBe(true);
+  });
+
+  it('rejects an unknown policy', () => {
+    const m = clean();
+    m.formatting = 'pretty';
+    expect(errorsOf(m)).toMatch(/manifest.formatting "pretty" is not a known formatting policy/);
+  });
+});
+
+describe('validateSourceManifest — directory descriptors', () => {
+  /** A manifest whose one config field is backed by a directory. */
+  function withDirectory(directory: unknown): Record<string, unknown> {
+    const m = clean();
+    m.config = { feeds: { label: 'Feeds', type: 'url[]', directory } };
+    return m;
+  }
+
+  it('accepts a well-formed directory', () => {
+    const m = withDirectory({ provider: 'feeds', mode: 'resolve', placeholder: 'Paste a URL' });
+    expect(validateSourceManifest(m).valid).toBe(true);
+  });
+
+  it('accepts every mode a client can render', () => {
+    for (const mode of DIRECTORY_MODES) {
+      expect(validateSourceManifest(withDirectory({ provider: 'feeds', mode })).valid).toBe(true);
+    }
+  });
+
+  it('rejects a directory that is not an object', () => {
+    expect(errorsOf(withDirectory('feeds'))).toMatch(
+      /manifest.config.feeds.directory must be an object/,
+    );
+  });
+
+  it('rejects a missing or empty provider', () => {
+    expect(errorsOf(withDirectory({ mode: 'search' }))).toMatch(
+      /manifest.config.feeds.directory.provider must be a non-empty string/,
+    );
+    expect(errorsOf(withDirectory({ provider: '', mode: 'search' }))).toMatch(
+      /directory.provider must be a non-empty string/,
+    );
+  });
+
+  it('rejects a mode no client can render', () => {
+    expect(errorsOf(withDirectory({ provider: 'feeds', mode: 'browse' }))).toMatch(
+      /manifest.config.feeds.directory.mode must be one of: search, resolve \(got "browse"\)/,
+    );
+  });
+
+  it('resolves the provider against the catalog when one is supplied', () => {
+    const m = withDirectory({ provider: 'feds', mode: 'search' });
+    const result = validateSourceManifest(m, {
+      directoryProviderExists: (name) => name === 'feeds',
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join('\n')).toMatch(
+      /directory.provider "feds" is not a directory provider this catalog knows/,
+    );
+  });
+
+  it('accepts any provider name when the caller cannot resolve them', () => {
+    expect(validateSourceManifest(withDirectory({ provider: 'feds', mode: 'search' })).valid).toBe(
+      true,
+    );
+  });
+});
+
+describe('validateSourceManifest — reports every problem at once', () => {
+  it('collects independent errors rather than stopping at the first', () => {
+    const result = validateSourceManifest(
+      {
+        id: 'Bad ID',
+        name: 'X',
+        version: 'v1',
+        kind: 'feed',
+        transport: 'browser',
+        watermark: 'date',
+        documentSemantics: 'append',
+        location: 'cloud',
+        schedule: 'hourly',
+        formatting: 'pretty',
+      },
+      { implemented: true },
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors.length).toBeGreaterThanOrEqual(6);
+  });
+});
+
+describe('the exported vocabulary', () => {
+  it('keeps the MVP cut a subset of each full vocabulary', () => {
+    for (const value of MVP.kinds) expect(SOURCE_KINDS).toContain(value);
+    for (const value of MVP.transports) expect(TRANSPORTS).toContain(value);
+    for (const value of MVP.watermarks) expect(WATERMARK_STRATEGIES).toContain(value);
+    for (const value of MVP.documentSemantics) expect(DOCUMENT_SEMANTICS).toContain(value);
+  });
+
+  it('keeps the cloud-eligible transports a subset of the transports', () => {
+    for (const value of CLOUD_ELIGIBLE_TRANSPORTS) expect(TRANSPORTS).toContain(value);
+  });
+
+  it('exposes the four type-system fields with their vocabularies', () => {
+    expect(Object.keys(SOURCE_TYPE_FIELDS)).toEqual([
+      'kind',
+      'transport',
+      'watermark',
+      'documentSemantics',
+    ]);
+    expect(SOURCE_TYPE_FIELDS.kind).toBe(SOURCE_KINDS);
+    expect(SOURCE_TYPE_FIELDS.transport).toBe(TRANSPORTS);
+    expect(SOURCE_TYPE_FIELDS.watermark).toBe(WATERMARK_STRATEGIES);
+    expect(SOURCE_TYPE_FIELDS.documentSemantics).toBe(DOCUMENT_SEMANTICS);
+  });
+
+  it('offers exactly two locations, since the eligibility rule is one-way', () => {
+    expect([...LOCATIONS]).toEqual(['cloud', 'client']);
   });
 });
 

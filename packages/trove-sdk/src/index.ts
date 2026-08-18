@@ -15,21 +15,23 @@
  *   directly rather than re-declaring them.
  * - **`runSource`** — the local-run harness the CLI drives, with the same
  *   validation and dedup the cloud applies.
- * - **`validateSourceManifest`** — what a manifest must say to be installable.
+ * - **`validateSourceManifest`** — what a manifest must say to be installable,
+ *   including the vocabulary itself: which `kind`, `transport`, `watermark` and
+ *   `documentSemantics` values exist, and which subset is buildable today.
+ * - **The watermark writer** — {@link dateWatermark}, {@link idSetWatermark} and
+ *   their readers. The type and the code that produces it are now in one place,
+ *   so the contract test asserts against the writer rather than fixtures.
+ * - **The guarded fetch seam** — {@link fetchPage} / {@link fetchBytes}, with the
+ *   host guard, timeout and size caps a source should never re-implement. It
+ *   takes the `fetch` it is given, so a source called with a capability-bearing
+ *   `ctx.fetch` uses that one.
  *
  * ## What it does not own yet
  *
- * The helpers a source is mostly written against — feed parsing, HTML to text,
- * the scrape loop, and the code that WRITES a watermark — are not here. Each
- * catalog of sources carries its own, which means the shapes below are agreed
- * by convention at the boundary rather than by a shared implementation behind
- * it. {@link Watermark} shows the cost: the type had to be reconciled after the
- * fact against the writers that move the value, and the contract test pins the
- * agreed bytes as fixtures because there is no writer here to test.
- *
- * The direction is for this package to own those helpers, so that a source
- * imports the behaviour rather than copying it. Until then, a change to the
- * shapes below has to be carried into every catalog deliberately.
+ * Feed and HTML parsing — the RSS/Atom reader, HTML to text, the scrape loop —
+ * still live alongside the sources themselves. Those are the next candidates;
+ * the pieces every source needs in order to be *correct* rather than merely
+ * convenient now live here.
  *
  * It is the symmetric sibling of `@ontrove/mcp`, the toolkit-authoring library
  * (every toolkit runs as a full MCP server on Trove's cloud): a source returns
@@ -64,9 +66,48 @@
 
 export { defineSource, defineSync } from './define.js';
 export {
+  assertPublicHttpUrl,
+  FETCH_TIMEOUT_MS,
+  type FetchedPage,
+  fetchBytes,
+  fetchPage,
+  fetchPageWithMeta,
+  type GuardedFetchOptions,
+  HttpStatusError,
+  isTooLargeError,
+  MAX_REDIRECTS,
+  MAX_RESPONSE_BYTES,
+  ResponseTooLargeError,
+  TROVE_USER_AGENT,
+} from './http.js';
+export {
+  CLOUD_ELIGIBLE_TRANSPORTS,
+  DIRECTORY_AUTH_STRATEGIES,
+  DIRECTORY_MODES,
+  type DirectoryAuthStrategy,
+  type DirectoryMode,
+  DOCUMENT_SEMANTICS,
+  type DocumentSemantics,
+  FAN_OUT_FIELD_TYPES,
+  type FanOutFieldType,
+  FORMATTING,
+  type FormattingPolicy,
   isCredentialConfigKey,
+  LOCATIONS,
+  type ManifestValidationOptions,
   type ManifestValidationResult,
+  MVP,
+  SOURCE_KINDS,
+  SOURCE_TYPE_FIELDS,
+  type SourceKind,
+  type SourceLocation,
+  type SourceSchedule,
+  type SourceTransport,
+  TRANSPORTS,
+  VALID_SCHEDULES,
   validateSourceManifest,
+  WATERMARK_STRATEGIES,
+  type WatermarkStrategy,
 } from './manifest.js';
 export {
   type RunOptions,
@@ -86,3 +127,12 @@ export type {
   TroveSource,
   Watermark,
 } from './types.js';
+export {
+  advanceDateWatermark,
+  DEFAULT_ID_SET_MAX,
+  dateWatermark,
+  idSetWatermark,
+  MAX_ID_SET_BYTES,
+  readDateWatermark,
+  readIdSet,
+} from './watermark.js';

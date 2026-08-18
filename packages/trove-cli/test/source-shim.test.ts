@@ -6,7 +6,7 @@ import {
   type DeployableSource,
   handleInvoke,
   type SourceInvokeResult,
-  toWatermark,
+  toCursor,
   toWireDocument,
 } from '../src/runtime/source-shim.js';
 
@@ -36,30 +36,43 @@ async function invoke(
   return { status: response.status, json: (await response.json()) as Record<string, unknown> };
 }
 
-describe('toWatermark', () => {
+describe('toCursor', () => {
   it('reads back a watermark this shim returned', () => {
-    expect(toWatermark({ type: 'date', value: '2026-01-01' })).toEqual({
+    expect(toCursor({ type: 'date', value: '2026-01-01' })).toEqual({
       type: 'date',
       value: '2026-01-01',
     });
-    expect(toWatermark({ type: 'idSet', values: ['a'] })).toEqual({
+    expect(toCursor({ type: 'idSet', values: ['a'] })).toEqual({
       type: 'idSet',
       values: ['a'],
     });
   });
 
   it('reads a bare string cursor as a date watermark', () => {
-    expect(toWatermark('2026-01-01')).toEqual({ type: 'date', value: '2026-01-01' });
+    expect(toCursor('2026-01-01')).toEqual({ type: 'date', value: '2026-01-01' });
   });
 
-  it('resolves a first run, and anything unrecognisable, to none', () => {
-    // Unrecognisable resolves rather than throwing: the bad cursor is already
-    // stored, so throwing would strand the feed on every future run.
-    expect(toWatermark(null)).toEqual({ type: 'none' });
-    expect(toWatermark(undefined)).toEqual({ type: 'none' });
-    expect(toWatermark('')).toEqual({ type: 'none' });
-    expect(toWatermark(42)).toEqual({ type: 'none' });
-    expect(toWatermark({ type: 'wat' })).toEqual({ type: 'none' });
+  it('hands back a shape this union does not name, unchanged', () => {
+    // The case this function existed to break. Trove stores a cursor as opaque
+    // JSON and returns exactly what the source wrote, so a source resuming from
+    // a post id gets `{ sinceId }` back — and used to get `{ type: 'none' }`,
+    // which reads as "first run" to every adapter. Its watermark never
+    // advanced and its metered API was re-read from the top, forever, silently.
+    expect(toCursor({ sinceId: '9' })).toEqual({ sinceId: '9' });
+    expect(toCursor({ done: ['a'], partial: { key: 'b', next: 2 } })).toEqual({
+      done: ['a'],
+      partial: { key: 'b', next: 2 },
+    });
+  });
+
+  it('leaves a first run absent rather than inventing a position', () => {
+    // `{ type: 'none' }` is what a source RETURNS to mean "no new position". An
+    // adapter on its first run tests `if (!ctx.cursor)`, so handing it an object
+    // makes every first run look like a resume.
+    expect(toCursor(null)).toBeUndefined();
+    expect(toCursor(undefined)).toBeUndefined();
+    expect(toCursor('')).toBeUndefined();
+    expect(toCursor(42)).toBeUndefined();
   });
 });
 

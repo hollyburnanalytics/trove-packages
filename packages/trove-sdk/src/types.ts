@@ -301,11 +301,23 @@ export interface SourceContext<C = Record<string, unknown>> extends ExtensionCon
    */
   readonly config: C;
   /**
-   * The feed's current watermark (the position from the previous run), or
-   * `{ type: 'none' }` on the first sync. Read-only — advance the cursor by
-   * returning a new {@link Watermark} from `sync`, not by mutating this.
+   * The feed's current watermark — the position from the previous run — and
+   * **absent on the first sync**. Read-only: advance the cursor by returning a
+   * new {@link Watermark} from `sync`, not by mutating this.
+   *
+   * It was declared required here, documented as `{ type: 'none' }` on a first
+   * run, and delivered as neither: Trove's runtime passes `undefined`, the
+   * invoke contract's own case says "a wire null cursor becomes undefined", and
+   * every adapter tests `if (!ctx.cursor)`. An author who believed the type and
+   * wrote `ctx.cursor.type` compiled cleanly and crashed on the first sync of
+   * every feed. `{ type: 'none' }` is what a source RETURNS to mean "no new
+   * position"; it is not what it is handed.
+   *
+   * Whatever was stored comes back UNCHANGED, including a shape this union does
+   * not name — Trove keeps a cursor as opaque JSON. A source with its own
+   * checkpoint reads it as `unknown` and narrows at its own boundary.
    */
-  readonly cursor: Watermark;
+  readonly cursor?: Watermark;
   /**
    * When this round must be finished, as epoch milliseconds.
    *

@@ -22,6 +22,7 @@ import {
   FORMATTING,
   LOCATIONS,
   MVP,
+  MVP_DEPLOYED_WATERMARKS,
   SOURCE_KINDS,
   TRANSPORTS,
   VALID_SCHEDULES,
@@ -103,6 +104,43 @@ export function requireString(value: unknown, field: string, errors: string[]): 
 }
 
 /**
+ * Why a value that exists in the vocabulary is still refused for this source.
+ *
+ * Split out because the two reasons are genuinely different and a reader needs
+ * to know which one they hit: a strategy nothing runs anywhere is "come back
+ * later", while one that runs on the OTHER runtime is "you are one manifest
+ * line from it working".
+ *
+ * @param refusal - The field, its value, and which runtime the source declares.
+ * @returns The message to append.
+ */
+function reservedValueError(refusal: {
+  field: string;
+  value: string;
+  noun: string;
+  built: readonly string[];
+  isDeployed: boolean;
+}): string {
+  const { field, value, noun, built, isDeployed } = refusal;
+  const runsWhenDeployed =
+    field === 'watermark' &&
+    !isDeployed &&
+    (MVP_DEPLOYED_WATERMARKS as readonly string[]).includes(value);
+  if (runsWhenDeployed) {
+    return (
+      `manifest.${field} "${value}" is a reserved ${noun} on the bundled runtime, which PARSES ` +
+      `the cursor — a shape it does not name parses to nothing and the source starts from the ` +
+      `beginning every run. Use one of: ${built.join(', ')}, or declare "runtime": "deployed", ` +
+      'where the cursor is returned unchanged.'
+    );
+  }
+  return (
+    `manifest.${field} "${value}" is a reserved ${noun} that nothing runs yet; ` +
+    `a source with code must use one of: ${built.join(', ')}`
+  );
+}
+
+/**
  * Check the four type-system fields against their vocabularies, and — for a
  * source that has code — against the subset built today.
  *
@@ -120,7 +158,13 @@ export function checkTypeFields(
   implemented: boolean,
   errors: string[],
 ): void {
-  for (const { field, allowed, built, noun } of TYPE_FIELD_RULES) {
+  // A deployed source's cursor is handed back byte-for-byte, so it may resume
+  // from a monotonic id; a bundled one's is parsed, and a shape the union does
+  // not name parses to nothing. Same field, two answers — see
+  // MVP_DEPLOYED_WATERMARKS.
+  const isDeployed = manifest.runtime === 'deployed';
+  for (const { field, allowed, built: cut, noun } of TYPE_FIELD_RULES) {
+    const built = field === 'watermark' && isDeployed ? MVP_DEPLOYED_WATERMARKS : cut;
     const value = manifest[field];
     if (value === undefined) {
       if (required) {
@@ -135,9 +179,7 @@ export function checkTypeFields(
       continue;
     }
     if (implemented && !built.includes(value)) {
-      errors.push(
-        `manifest.${field} "${value}" is a reserved ${noun} that nothing runs yet; a source with code must use one of: ${built.join(', ')}`,
-      );
+      errors.push(reservedValueError({ field, value, noun, built, isDeployed }));
     }
   }
   if (manifest.document_semantics !== undefined) {

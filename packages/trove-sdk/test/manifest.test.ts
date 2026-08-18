@@ -456,3 +456,52 @@ describe('isCredentialConfigKey', () => {
     }
   });
 });
+
+describe('the cut a deployed source is held to', () => {
+  /** A manifest that is valid but for what a case changes. */
+  const base = {
+    id: 'x',
+    name: 'X',
+    version: '1.0.0',
+    kind: 'scheduled-sync',
+    transport: 'api',
+    documentSemantics: 'append',
+    location: 'cloud',
+    schedule: 'daily',
+  };
+
+  it('lets a deployed source resume from a high-water id', () => {
+    // Its cursor is handed back byte-for-byte, so the shape works — and one
+    // shipped source has been using it, declaring a value in no vocabulary
+    // because the cut had no way to say "deployed only".
+    const result = validateSourceManifest(
+      { ...base, watermark: 'highWaterId', runtime: 'deployed' },
+      { implemented: true },
+    );
+    expect(result.errors).toEqual([]);
+    expect(result.valid).toBe(true);
+  });
+
+  it('refuses the same strategy on the bundled runtime, and says why', () => {
+    // The bundled runtime PARSES the cursor, and a shape the union does not
+    // name parses to nothing: the source would start from the beginning every
+    // run, silently. The message has to carry that, because "reserved" alone
+    // reads as "coming soon" rather than "this would break".
+    const result = validateSourceManifest(
+      { ...base, watermark: 'highWaterId' },
+      { implemented: true },
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors[0]).toMatch(/bundled runtime, which PARSES the cursor/);
+    expect(result.errors[0]).toMatch(/runtime.*deployed/);
+  });
+
+  it('still refuses a value from no vocabulary at all', () => {
+    const result = validateSourceManifest(
+      { ...base, watermark: 'id', runtime: 'deployed' },
+      { implemented: true },
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors[0]).toMatch(/is not a known watermark strategy/);
+  });
+});

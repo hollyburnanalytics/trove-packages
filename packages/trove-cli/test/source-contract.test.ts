@@ -13,6 +13,7 @@
  * @module
  */
 
+import type { SourceContext } from '@ontrove/sdk';
 import {
   type AdapterSpec,
   CASE_SECTIONS,
@@ -80,6 +81,39 @@ describe('createSourceWorker answers the contract route', () => {
       }),
     );
     expect(response.status).toBe(routeCase.status);
+  });
+});
+
+describe('createSourceWorker builds the contract context', () => {
+  // `context` is a PRODUCER section, and this package produces. It was the one
+  // producer section nobody ran here — which is how a shim that reshapes the
+  // cursor passed every test in this file while breaking the case named
+  // "config, credentials and cursor reach the adapter unchanged".
+  it.each(contract.context)('$name', async (contextCase) => {
+    let seen: SourceContext | undefined;
+    const worker = createSourceWorker({
+      async sync(ctx) {
+        seen = ctx;
+        return { documents: [] };
+      },
+    });
+    await worker.fetch(
+      new Request(contract.constants.invokeUrl, {
+        method: 'POST',
+        body: JSON.stringify(contextCase.request),
+      }),
+    );
+    const ctx = seen as unknown as Record<string, unknown> & {
+      log: Record<string, unknown>;
+      deadline: number;
+    };
+    const want = contextCase.expect;
+
+    if ('config' in want) expect(ctx.config).toEqual(want.config);
+    if ('cursor' in want) expect(ctx.cursor).toEqual(want.cursor);
+    if (want.cursorAbsent === true) expect(ctx.cursor).toBeUndefined();
+    for (const name of want.functions ?? []) expect(typeof ctx[name]).toBe('function');
+    for (const level of want.logLevels ?? []) expect(typeof ctx.log[level]).toBe('function');
   });
 });
 

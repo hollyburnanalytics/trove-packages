@@ -192,6 +192,33 @@ export const MVP: {
 };
 
 /**
+ * The watermark strategies a `runtime: deployed` source may additionally use.
+ *
+ * The cut is not one list, because the two runtimes genuinely differ here and
+ * pretending otherwise is what produced a shipped manifest declaring a strategy
+ * that exists in no vocabulary.
+ *
+ * A DEPLOYED source's cursor is handed back byte-for-byte: Trove stores it as
+ * opaque JSON and the invoke contract requires it reach the adapter unchanged.
+ * So a source resuming from a monotonic id — the newest post it saw, and "give
+ * me everything after this" — works today, and one does.
+ *
+ * A BUNDLED source's cursor is parsed before it is handed over, and a shape the
+ * {@link Watermark} union does not name parses to nothing. The same source
+ * compiled into the cloud runtime would silently start from the beginning on
+ * every run, which is why `highWaterId` is NOT in {@link MVP} and a bundled
+ * source declaring it is refused.
+ *
+ * The distinction is worth a second list rather than a footnote: it is the
+ * difference between a source that resumes and one that re-reads a metered API
+ * from the top, forever, without an error anywhere.
+ */
+export const MVP_DEPLOYED_WATERMARKS: readonly WatermarkStrategy[] = [
+  ...MVP.watermarks,
+  'highWaterId',
+];
+
+/**
  * The four type-system fields with their full vocabularies, keyed by field
  * name. Exported so a catalog can render the taxonomy — a picker, a docs table,
  * a test that asserts every source's declaration is in range — from the same

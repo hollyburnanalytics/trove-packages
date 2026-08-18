@@ -243,6 +243,7 @@ export {
   type FormattingPolicy,
   LOCATIONS,
   MVP,
+  MVP_DEPLOYED_WATERMARKS,
   SOURCE_KINDS,
   SOURCE_TYPE_FIELDS,
   type SourceKind,

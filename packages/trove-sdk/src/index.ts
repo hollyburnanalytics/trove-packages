@@ -97,6 +97,7 @@ export {
   type ManifestValidationOptions,
   type ManifestValidationResult,
   MVP,
+  MVP_DEPLOYED_WATERMARKS,
   SOURCE_KINDS,
   SOURCE_TYPE_FIELDS,
   type SourceKind,

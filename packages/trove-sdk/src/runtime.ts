@@ -210,7 +210,14 @@ export async function runSource<C = Record<string, unknown>>(
   options: RunOptions<C> = {},
 ): Promise<RunResult> {
   const logs: unknown[][] = [];
-  const cursor: Watermark = options.cursor ?? { type: 'none' };
+  // Absent stays absent. `{ type: 'none' }` is the shape a source RETURNS to
+  // mean "no new position" — see {@link RunResult.cursor} — and it is NOT what
+  // an adapter is handed on a first run: every adapter tests `if (!ctx.cursor)`
+  // or reads a field off it, so substituting an object here makes a first run
+  // look like a resume from a position nobody stored. The invoke contract says
+  // the same in its own words ("a wire null cursor becomes undefined"), and
+  // Trove's own runtime has always passed `undefined` through.
+  const cursor: Watermark | undefined = options.cursor;
   const fetchImpl: FetchLike =
     options.fetchImpl ??
     ((url: string | URL, init?: RequestInit): Promise<Response> => globalThis.fetch(url, init));
@@ -239,7 +246,7 @@ export async function runSource<C = Record<string, unknown>>(
 
   const ctx: SourceContext<C> = {
     config: options.config ?? ({} as C),
-    cursor,
+    ...(cursor !== undefined && { cursor }),
     fetch: fetchImpl,
     log,
     now,

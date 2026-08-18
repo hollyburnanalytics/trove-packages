@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Watermark } from '../src/types.js';
+import { dateWatermark, idSetWatermark } from '../src/watermark.js';
 
 /**
  * The wire contract for `Watermark`.
@@ -9,21 +10,23 @@ import type { Watermark } from '../src/types.js';
  * and Trove hands it back on the next run as `ctx.cursor`. Three
  * implementations therefore have to agree on the same bytes:
  *
- * 1. the writer — `idSetWatermark(values, max)` / `dateWatermark(iso, opts)`,
- *    which emit `max` as the **numeric cap** they applied and `inclusive: true`
- *    only when set;
- * 2. Trove's reader — `parseWatermark()`, which keeps `max` only when
- *    `typeof max === 'number'` and projects it as the set's capacity;
- * 3. this type.
+ * 1. the writer — {@link dateWatermark} / {@link idSetWatermark}, now in this
+ *    package;
+ * 2. Trove's reader, which keeps `max` only when it is a number and projects it
+ *    as the set's capacity;
+ * 3. the {@link Watermark} type.
  *
  * (3) disagreed with (1) and (2) — it declared `max?: string` and omitted
- * `inclusive` — so this file pins the agreed bytes. Each fixture below is
- * simultaneously a JSON string (what is stored) and a `Watermark`-typed
- * literal (what this package promises), and the test asserts they are the same
- * value. The literal is checked at compile time by its annotation; the string
- * is checked at runtime by the round-trip. The same fixtures are asserted
- * against the reader in Trove's
- * `test/unit/features/ingest/watermark.test.ts` — keep the two lists identical.
+ * `inclusive` — so the fixtures below pin the agreed bytes. Each is
+ * simultaneously a JSON string (what is stored) and a `Watermark`-typed literal
+ * (what this package promises), and the test asserts they are the same value.
+ *
+ * The fixtures used to be the whole test, because the writer lived in another
+ * repository and there was nothing here to run. Now that it is here, each
+ * fixture is also produced by the writer and compared byte for byte — so a
+ * change to the writer that breaks the wire format fails HERE, rather than in a
+ * catalog months later. The reader's half is still asserted in Trove against
+ * the same list; keep the two identical.
  */
 interface WatermarkFixture {
   /** What the test output calls this case. */
@@ -75,6 +78,22 @@ describe('Watermark wire contract', () => {
       expect(JSON.parse(JSON.stringify(fixture.value))).toEqual(fixture.value);
     });
   }
+
+  it('is what the writer actually emits, not only what the type permits', () => {
+    // The half that could not be written while the writer lived elsewhere: the
+    // fixtures are now compared against the functions that produce them, so a
+    // writer change that breaks the stored format fails in this package rather
+    // than in a catalog a release later.
+    expect(JSON.stringify(dateWatermark('2026-05-30T00:00:00.000Z'))).toBe(
+      '{"type":"date","value":"2026-05-30T00:00:00.000Z"}',
+    );
+    expect(JSON.stringify(dateWatermark('2026-05-30T00:00:00.000Z', { inclusive: true }))).toBe(
+      '{"type":"date","value":"2026-05-30T00:00:00.000Z","inclusive":true}',
+    );
+    expect(JSON.stringify(idSetWatermark(['a', 'b']))).toBe(
+      '{"type":"idSet","values":["a","b"],"max":10000}',
+    );
+  });
 
   it('carries the idSet cap as a number, never a numeric string', () => {
     // The failure this pins: Trove's reader keeps `max` only when it is a

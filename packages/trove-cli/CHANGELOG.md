@@ -1,5 +1,22 @@
 # @ontrove/cli
 
+## 0.11.0
+
+### Patch Changes
+
+- 075799f: Test-only: fix seven broken optional chains that Biome 2.5.8 caught.
+- 25ed77d: `trove source init` now scaffolds a manifest that `trove source validate`
+  accepts. It did not: `kind` held a transport (`feed`), `transport` held a value
+  from no vocabulary (`http`), `document_semantics` was both the former field name
+  and a value that never existed (`text`), and `watermark` and `location` were
+  missing. Nothing objected, because the validator did not yet know the
+  vocabulary — so a new author's first two commands succeeded and their first
+  deploy did not.
+- Updated dependencies [25ed77d]
+- Updated dependencies [9cec39d]
+  - @ontrove/sdk@0.11.0
+  - @ontrove/mcp@0.11.0
+
 ## 0.10.4
 
 ### Patch Changes

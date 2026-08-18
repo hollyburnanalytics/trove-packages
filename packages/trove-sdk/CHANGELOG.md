@@ -1,5 +1,40 @@
 # @ontrove/sdk
 
+## 0.11.0
+
+### Minor Changes
+
+- 25ed77d: The SDK now owns the pieces a source needs in order to be **correct**, not only
+  the shapes it has to match.
+
+  - **The watermark writer** — `dateWatermark`, `idSetWatermark`,
+    `advanceDateWatermark` and their readers, with the entry cap AND the byte
+    budget the platform's cursor limit requires. The wire-contract test now
+    asserts its fixtures against the writer that produces them, instead of pinning
+    bytes written elsewhere.
+  - **The guarded fetch seam** — `fetchPage`, `fetchPageWithMeta`, `fetchBytes`
+    and `assertPublicHttpUrl`, with the host guard, request timeout,
+    declared-length cap and streaming byte cap. It uses the `fetch` it is given,
+    so a source called with a capability-bearing `ctx.fetch` goes through that
+    one. The guard refuses IPv4-mapped IPv6 (`[::ffff:127.0.0.1]`), which
+    normalizes to a form with no dotted quad left to check and slipped past a
+    hand-written implementation of the same rules.
+  - **The manifest vocabulary** — `SOURCE_KINDS`, `TRANSPORTS`, `LOCATIONS`,
+    `WATERMARK_STRATEGIES`, `DOCUMENT_SEMANTICS`, `FORMATTING`, `MVP` and the
+    rest, with per-field validation folded into `validateSourceManifest`.
+
+  No existing export changed shape; `validateSourceManifest`'s new second
+  parameter is optional.
+
+### Patch Changes
+
+- 9cec39d: Documentation only: the package now describes what it owns (the invoke
+  contract, the types, `runSource`, manifest validation) and what it does not yet
+  own (the helpers a source is actually written against — feed parsing, HTML to
+  text, the scrape loop, the watermark writer). The previous wording called it
+  "the thin standard library for authoring Trove sources", which described the
+  intended destination rather than the current package.
+
 ## 0.10.4
 
 ## 0.10.3

@@ -1,24 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import type { Watermark } from '../src/types.js';
-import { dateWatermark, idSetWatermark } from '../src/watermark.js';
+import { dateCursor, idSetCursor } from '../src/cursor.js';
+import type { Cursor } from '../src/types.js';
 
 /**
- * The wire contract for `Watermark`.
+ * The wire contract for `Cursor`.
  *
- * A watermark is written by one program and read by another: a source returns
+ * A cursor is written by one program and read by another: a source returns
  * it from `sync`, it is stored as an opaque JSON string on the feed's cursor,
  * and Trove hands it back on the next run as `ctx.cursor`. Three
  * implementations therefore have to agree on the same bytes:
  *
- * 1. the writer — {@link dateWatermark} / {@link idSetWatermark}, now in this
+ * 1. the writer — {@link dateCursor} / {@link idSetCursor}, now in this
  *    package;
  * 2. Trove's reader, which keeps `max` only when it is a number and projects it
  *    as the set's capacity;
- * 3. the {@link Watermark} type.
+ * 3. the {@link Cursor} type.
  *
  * (3) disagreed with (1) and (2) — it declared `max?: string` and omitted
  * `inclusive` — so the fixtures below pin the agreed bytes. Each is
- * simultaneously a JSON string (what is stored) and a `Watermark`-typed literal
+ * simultaneously a JSON string (what is stored) and a `Cursor`-typed literal
  * (what this package promises), and the test asserts they are the same value.
  *
  * The fixtures used to be the whole test, because the writer lived in another
@@ -28,17 +28,17 @@ import { dateWatermark, idSetWatermark } from '../src/watermark.js';
  * catalog months later. The reader's half is still asserted in Trove against
  * the same list; keep the two identical.
  */
-interface WatermarkFixture {
+interface CursorFixture {
   /** What the test output calls this case. */
   readonly name: string;
   /** Exactly what the writer serializes into the feed's cursor column. */
   readonly json: string;
   /** The same value as a typed literal — the compile-time half of the test. */
-  readonly value: Watermark;
+  readonly value: Cursor;
 }
 
 /** The canonical wire values, one per shape the writer can emit. */
-const FIXTURES: readonly WatermarkFixture[] = [
+const FIXTURES: readonly CursorFixture[] = [
   {
     name: 'date',
     json: '{"type":"date","value":"2026-05-30T00:00:00.000Z"}',
@@ -66,13 +66,13 @@ const FIXTURES: readonly WatermarkFixture[] = [
   },
 ];
 
-describe('Watermark wire contract', () => {
+describe('Cursor wire contract', () => {
   for (const fixture of FIXTURES) {
-    it(`accepts the stored JSON for a ${fixture.name} watermark`, () => {
+    it(`accepts the stored JSON for a ${fixture.name} cursor`, () => {
       expect(JSON.parse(fixture.json)).toEqual(fixture.value);
     });
 
-    it(`serializes a ${fixture.name} watermark back to the stored JSON`, () => {
+    it(`serializes a ${fixture.name} cursor back to the stored JSON`, () => {
       // Round-tripping in both directions is what makes the fixture usable as a
       // contract fixture: a reader can be fed `json`, a writer compared to it.
       expect(JSON.parse(JSON.stringify(fixture.value))).toEqual(fixture.value);
@@ -84,13 +84,13 @@ describe('Watermark wire contract', () => {
     // fixtures are now compared against the functions that produce them, so a
     // writer change that breaks the stored format fails in this package rather
     // than in a catalog a release later.
-    expect(JSON.stringify(dateWatermark('2026-05-30T00:00:00.000Z'))).toBe(
+    expect(JSON.stringify(dateCursor('2026-05-30T00:00:00.000Z'))).toBe(
       '{"type":"date","value":"2026-05-30T00:00:00.000Z"}',
     );
-    expect(JSON.stringify(dateWatermark('2026-05-30T00:00:00.000Z', { inclusive: true }))).toBe(
+    expect(JSON.stringify(dateCursor('2026-05-30T00:00:00.000Z', { inclusive: true }))).toBe(
       '{"type":"date","value":"2026-05-30T00:00:00.000Z","inclusive":true}',
     );
-    expect(JSON.stringify(idSetWatermark(['a', 'b']))).toBe(
+    expect(JSON.stringify(idSetCursor(['a', 'b']))).toBe(
       '{"type":"idSet","values":["a","b"],"max":10000}',
     );
   });
@@ -100,7 +100,7 @@ describe('Watermark wire contract', () => {
     // number, so a source that wrote `max: "10000"` would have the cap silently
     // dropped and the feed would never report itself at capacity.
     const caps = FIXTURES.map((fixture) => fixture.value)
-      .filter((value): value is Extract<Watermark, { type: 'idSet' }> => value.type === 'idSet')
+      .filter((value): value is Extract<Cursor, { type: 'idSet' }> => value.type === 'idSet')
       .map((value) => value.max);
     expect(caps).toEqual([10000, undefined]);
   });

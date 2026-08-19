@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
-import type { SourceDocument, TroveSource, Watermark } from '@ontrove/sdk';
+import type { Cursor, Document, TroveSource } from '@ontrove/sdk';
 import type { CommandContext } from '../context.js';
 import { CliError, ExitCode, usageError } from '../errors.js';
 import { flag, type ParsedArgs } from '../lib/args.js';
@@ -141,7 +141,7 @@ export function fixtureFetch(fixtures: Fixtures): typeof fetch {
  * @param docs - The validated documents from `runSource`.
  * @returns The list of problems (empty when the run is usable).
  */
-export function assertDocuments(docs: SourceDocument[]): string[] {
+export function assertDocuments(docs: Document[]): string[] {
   return docs.length === 0 ? ['sync returned no documents'] : [];
 }
 
@@ -166,7 +166,7 @@ export async function resolveTarget(
   ctx: CommandContext,
   manifest: Record<string, unknown>,
   args: ParsedArgs,
-): Promise<{ sourceId: string; feedId: string; cursor: Watermark }> {
+): Promise<{ sourceId: string; feedId: string; cursor: Cursor }> {
   const client = ctx.client();
   const sourceName =
     flag(args, 'source') ?? (typeof manifest.name === 'string' ? manifest.name : undefined);

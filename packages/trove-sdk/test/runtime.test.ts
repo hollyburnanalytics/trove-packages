@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { defineSource } from '../src/define.js';
 import { runSource } from '../src/runtime.js';
-import type { SourceContext, SourceDocument, TroveSource, Watermark } from '../src/types.js';
+import type { Cursor, Document, SourceContext, TroveSource } from '../src/types.js';
 
 describe('runSource — success', () => {
   it('runs sync and returns validated documents with a cursor', async () => {
@@ -13,7 +13,7 @@ describe('runSource — success', () => {
             { id: 'a', title: 'A', text: 'alpha' },
             { id: 'b', title: 'Doc b', text: 'beta', audioUrl: 'https://x/audio.mp3' },
           ],
-          cursor: { type: 'date', value: '2026-06-14T00:00:00Z' } satisfies Watermark,
+          cursor: { type: 'date', value: '2026-06-14T00:00:00Z' } satisfies Cursor,
         };
       },
     });
@@ -129,7 +129,7 @@ describe('runSource — validation errors', () => {
   it('throws on a missing id', async () => {
     const source = defineSource({
       async sync() {
-        return [{ text: 'no id' } as unknown as SourceDocument];
+        return [{ text: 'no id' } as unknown as Document];
       },
     });
     await expect(runSource(source)).rejects.toThrow(/missing a non-empty string `id`/);
@@ -138,7 +138,7 @@ describe('runSource — validation errors', () => {
   it('throws when neither text nor audioUrl is present', async () => {
     const source = defineSource({
       async sync() {
-        return [{ title: 'Fixture', id: 'a' } as SourceDocument];
+        return [{ title: 'Fixture', id: 'a' } as Document];
       },
     });
     await expect(runSource(source)).rejects.toThrow(/must provide `text` or `audioUrl`/);
@@ -147,9 +147,7 @@ describe('runSource — validation errors', () => {
   it('throws on an invalid contentType', async () => {
     const source = defineSource({
       async sync() {
-        return [
-          { id: 'a', title: 'Doc a', text: 'x', contentType: 'nope' } as unknown as SourceDocument,
-        ];
+        return [{ id: 'a', title: 'Doc a', text: 'x', contentType: 'nope' } as unknown as Document];
       },
     });
     await expect(runSource(source)).rejects.toThrow(/invalid contentType/);
@@ -158,7 +156,7 @@ describe('runSource — validation errors', () => {
   it('throws on a non-object document', async () => {
     const source = defineSource({
       async sync() {
-        return [null as unknown as SourceDocument];
+        return [null as unknown as Document];
       },
     });
     await expect(runSource(source)).rejects.toThrow(/must be an object/);
@@ -167,7 +165,7 @@ describe('runSource — validation errors', () => {
   it('throws when sync returns a malformed (non-array, no documents) value', async () => {
     const source = defineSource({
       async sync() {
-        return { nope: true } as unknown as SourceDocument[];
+        return { nope: true } as unknown as Document[];
       },
     });
     await expect(runSource(source)).rejects.toThrow(/array of documents/);
@@ -185,13 +183,13 @@ describe('runSource — validation errors', () => {
 
 describe('runSource — cursor passthrough', () => {
   it('passes the input cursor through to ctx and returns the new cursor', async () => {
-    const input: Watermark = { type: 'date', value: '2026-06-01T00:00:00Z' };
+    const input: Cursor = { type: 'date', value: '2026-06-01T00:00:00Z' };
     const source = defineSource({
       async sync(ctx) {
         expect(ctx.cursor).toEqual(input);
         return {
           documents: [{ id: 'a', title: 'Doc a', text: 'x' }],
-          cursor: { type: 'date', value: '2026-06-14T00:00:00Z' } as Watermark,
+          cursor: { type: 'date', value: '2026-06-14T00:00:00Z' } as Cursor,
         };
       },
     });
@@ -214,10 +212,10 @@ describe('runSource — cursor passthrough', () => {
     await runSource(source);
   });
 
-  it('hands back a cursor shape the Watermark union does not name', async () => {
+  it('hands back a cursor shape the Cursor union does not name', async () => {
     // Trove stores a cursor as opaque JSON and returns exactly what was
     // written. A source resuming from a post id gets its own shape back.
-    const stored = { sinceId: '9' } as unknown as Watermark;
+    const stored = { sinceId: '9' } as unknown as Cursor;
     const source = defineSource({
       async sync(ctx) {
         expect(ctx.cursor).toEqual({ sinceId: '9' });

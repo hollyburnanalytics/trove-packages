@@ -1,9 +1,9 @@
-import type { SourceDocument, Watermark } from '@ontrove/sdk';
+import type { Cursor, Document } from '@ontrove/sdk';
 
 /**
  * Shared helpers for the source dev loop (`source dev/test/sync`): mapping
- * `@ontrove/sdk`'s `SourceDocument` onto the GraphQL `IngestDocumentInput`, and
- * (de)serializing the typed {@link Watermark} to/from the opaque
+ * `@ontrove/sdk`'s `Document` onto the GraphQL `IngestDocumentInput`, and
+ * (de)serializing the typed {@link Cursor} to/from the opaque
  * `Feed.cursor`/`ingestDocuments(cursor)` string.
  *
  * @module
@@ -11,7 +11,7 @@ import type { SourceDocument, Watermark } from '@ontrove/sdk';
 
 /** The `IngestDocumentInput` shape the GraphQL `ingestDocuments` mutation accepts. */
 export interface IngestDocumentInput {
-  /** The dedup key — maps from `SourceDocument.id`. */
+  /** The dedup key — maps from `Document.id`. */
   externalId: string;
   /** The document title. */
   title?: string;
@@ -41,13 +41,13 @@ export interface IngestDocumentInput {
 
 /**
  * Map a source document to the `IngestDocumentInput` wire shape (the 1:1
- * mapping documented on `SourceDocument`: `id` → `externalId`, etc.). Only
+ * mapping documented on `Document`: `id` → `externalId`, etc.). Only
  * defined fields are included so the JSON stays minimal.
  *
  * @param doc - The source document.
  * @returns The wire `IngestDocumentInput`.
  */
-export function toIngestInput(doc: SourceDocument): IngestDocumentInput {
+export function toIngestInput(doc: Document): IngestDocumentInput {
   const input: IngestDocumentInput = { externalId: doc.id };
   if (doc.title !== undefined) input.title = doc.title;
   if (doc.text !== undefined) input.text = doc.text;
@@ -65,32 +65,32 @@ export function toIngestInput(doc: SourceDocument): IngestDocumentInput {
 }
 
 /**
- * Serialize a {@link Watermark} to the opaque cursor string stored on the feed.
+ * Serialize a {@link Cursor} to the opaque cursor string stored on the feed.
  * A `none` watermark serializes to `null` (no cursor change).
  *
  * @param cursor - The watermark to serialize.
  * @returns The cursor string, or null for `{ type: 'none' }`.
  */
-export function serializeCursor(cursor: Watermark): string | null {
+export function serializeCursor(cursor: Cursor): string | null {
   if (cursor.type === 'none') return null;
   return JSON.stringify(cursor);
 }
 
 /**
- * Parse the opaque feed cursor string back into a typed {@link Watermark}.
+ * Parse the opaque feed cursor string back into a typed {@link Cursor}.
  * Anything malformed or absent resolves to `{ type: 'none' }` so a first run (or
  * a legacy cursor) is always safe.
  *
  * @param raw - The stored cursor string (or null/undefined).
  * @returns The parsed watermark.
  */
-export function parseCursor(raw: string | null | undefined): Watermark {
+export function parseCursor(raw: string | null | undefined): Cursor {
   if (raw === null || raw === undefined || raw === '') return { type: 'none' };
   try {
     const parsed = JSON.parse(raw) as unknown;
     if (parsed !== null && typeof parsed === 'object') {
       const t = (parsed as { type?: unknown }).type;
-      if (t === 'date' || t === 'idSet' || t === 'none') return parsed as Watermark;
+      if (t === 'date' || t === 'idSet' || t === 'none') return parsed as Cursor;
     }
   } catch {
     // Not JSON — fall through to a date watermark (a bare ISO string cursor).

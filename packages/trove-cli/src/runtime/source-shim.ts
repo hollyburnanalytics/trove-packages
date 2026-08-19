@@ -1,4 +1,4 @@
-import type { SourceDocument, TroveSource, Watermark } from '@ontrove/sdk';
+import type { Cursor, Document, TroveSource } from '@ontrove/sdk';
 import { runSource } from '@ontrove/sdk';
 import { redirectFollowingFetch } from './redirect-fetch.js';
 
@@ -62,10 +62,10 @@ export interface SourceInvokeBody {
 
 /**
  * A document on the invoke wire. Snake-cased, and `title` is required — this is
- * the shape Trove's ingest door accepts, not the SDK's {@link SourceDocument}.
+ * the shape Trove's ingest door accepts, not the SDK's {@link Document}.
  */
 export interface WireDocument {
-  /** The stable upstream id — the dedup key, from `SourceDocument.id`. */
+  /** The stable upstream id — the dedup key, from `Document.id`. */
   id: string;
   /** The document title. Required here, optional in the SDK. */
   title: string;
@@ -98,7 +98,7 @@ export interface SourceInvokeResult {
    * `{ type: 'none' }` result is *not* an instruction to clear the cursor, and
    * sending one would make the next sync re-fetch the feed from the beginning.
    */
-  cursor?: Watermark;
+  cursor?: Cursor;
   /**
    * What the run did and what is left. `remaining > 0` asks the runner to drain
    * again rather than wait for the next scheduled tick, so a backfill finishes
@@ -140,7 +140,7 @@ function installRedirectPolicy(): void {
 }
 
 /**
- * Read the cursor the runner sent back into a typed {@link Watermark}.
+ * Read the cursor the runner sent back into a typed {@link Cursor}.
  *
  * Anything unrecognised resolves to `{ type: 'none' }`, which re-fetches and
  * relies on `(feed, id)` dedup — always correct, just less efficient. Throwing
@@ -150,7 +150,7 @@ function installRedirectPolicy(): void {
  * @param raw - Whatever was stored as this feed's cursor.
  * @returns The watermark to hand the adapter.
  */
-export function toCursor(raw: unknown): Watermark | undefined {
+export function toCursor(raw: unknown): Cursor | undefined {
   // Absent, and stays absent. `{ type: 'none' }` is the shape a source RETURNS
   // to mean "no new position"; it is not what an adapter is handed on a first
   // run, which tests `if (!ctx.cursor)`.
@@ -165,7 +165,7 @@ export function toCursor(raw: unknown): Watermark | undefined {
   // source's shape, because a source that resumes from a post id is a source
   // this reshaped into `{ type: 'none' }` on every run. Its watermark never
   // advanced and its metered API was re-read from the top forever, silently.
-  return raw as Watermark;
+  return raw as Cursor;
 }
 
 /**
@@ -180,7 +180,7 @@ export function toCursor(raw: unknown): Watermark | undefined {
  * @returns The wire document.
  * @throws {Error} When the document has no title.
  */
-export function toWireDocument(doc: SourceDocument): WireDocument {
+export function toWireDocument(doc: Document): WireDocument {
   // The local harness accepts an untitled document; the ingest door does not.
   // Refused here, naming the document, so the author reads their own id rather
   // than a rejection of the whole batch from a service they cannot see.

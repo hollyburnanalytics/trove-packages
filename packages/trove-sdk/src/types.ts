@@ -6,7 +6,7 @@
  * an object with a `sync(ctx)` method that fetches new content from the
  * upstream system and returns documents to index. The SDK owns the document shape (which maps 1:1 onto the
  * `IngestDocumentInput` wire type), the typed `ctx` capability object, the
- * watermark/cursor model, and the local-run harness the CLI drives.
+ * cursor/cursor model, and the local-run harness the CLI drives.
  *
  * It is the symmetric sibling of `@ontrove/mcp` (the toolkit-authoring library —
  * every toolkit runs as a full MCP server on Trove's cloud): a source returns
@@ -44,7 +44,7 @@ export type SourceContentType = 'text' | 'transcript' | 'highlight' | 'bookmark'
  * one of `text` or `audioUrl` must be present — an audio-only document triggers
  * transcription (Whisper), and the transcript becomes the document text.
  */
-export interface SourceDocument {
+export interface Document {
   /**
    * The stable external identifier from the upstream system — the dedup key
    * within the feed. Maps to `IngestDocumentInput.externalId`. Use the native id (HN
@@ -124,9 +124,9 @@ export interface SourceDocument {
 }
 
 /**
- * A typed watermark describing how a feed resumes between syncs. The opaque
+ * A typed cursor describing how a feed resumes between syncs. The opaque
  * `Feed.cursor` string is parsed into one of these (see the cursors guide,
- * watermark types).
+ * cursor types).
  *
  * - `date` — the feed is time-ordered and supports "since &lt;date&gt;"
  *   filtering (RSS, most APIs); the newest `value` you push becomes the next
@@ -140,10 +140,10 @@ export interface SourceDocument {
  * - `none` — re-fetch everything each run and rely purely on `(feed, id)`
  *   dedup. Always correct, just less efficient.
  */
-export type Watermark =
+export type Cursor =
   // `idSet.max` was declared `string` here until it was reconciled against the
   // two implementations that actually move this value, both of which say
-  // number: the writer bounds the set with `idSetWatermark(values, max)` and
+  // number: the writer bounds the set with `idSetCursor(values, max)` and
   // emits the numeric cap it applied, and Trove's reader projects the same
   // field as the set's capacity (`values.length >= max` is what surfaces "this
   // feed is now evicting"). Trove also hands its parsed cursor straight back as
@@ -159,15 +159,15 @@ export type Watermark =
 
 /**
  * The result of a source `sync`: the documents fetched this run and, optionally,
- * the watermark the feed should advance to. A source may also return a bare
- * `SourceDocument[]` for convenience — {@link runSource} normalizes that to
+ * the cursor the feed should advance to. A source may also return a bare
+ * `Document[]` for convenience — {@link runSource} normalizes that to
  * `{ documents }` with no cursor change.
  */
 export interface SourceSyncResult {
   /** The documents fetched this run, mapping 1:1 onto `IngestDocumentInput`. */
-  documents: SourceDocument[];
+  documents: Document[];
   /**
-   * The watermark to advance the feed's cursor to. Omit (or return
+   * The cursor to advance the feed's cursor to. Omit (or return
    * `{ type: 'none' }`) to leave the cursor unchanged — the two are synonyms,
    * and the platform now genuinely treats them as such.
    *
@@ -175,11 +175,11 @@ export interface SourceSyncResult {
    * monotonically ahead (compare-and-swap)". Half of that was wrong and worth
    * correcting rather than deleting: there IS a compare-and-swap, but it is
    * against the cursor the round STARTED from — it stops two concurrent syncs
-   * clobbering each other. Nothing compares watermark values for ordering.
+   * clobbering each other. Nothing compares cursor values for ordering.
    * Returning an older date than the stored one moves the feed backwards, and
    * this is the layer that decides what to return.
    */
-  cursor?: Watermark;
+  cursor?: Cursor;
   /**
    * What the feed calls itself, when the source learned it this run.
    *
@@ -301,9 +301,9 @@ export interface SourceContext<C = Record<string, unknown>> extends ExtensionCon
    */
   readonly config: C;
   /**
-   * The feed's current watermark — the position from the previous run — and
+   * The feed's current cursor — the position from the previous run — and
    * **absent on the first sync**. Read-only: advance the cursor by returning a
-   * new {@link Watermark} from `sync`, not by mutating this.
+   * new {@link Cursor} from `sync`, not by mutating this.
    *
    * It was declared required here, documented as `{ type: 'none' }` on a first
    * run, and delivered as neither: Trove's runtime passes `undefined`, the
@@ -317,7 +317,7 @@ export interface SourceContext<C = Record<string, unknown>> extends ExtensionCon
    * not name — Trove keeps a cursor as opaque JSON. A source with its own
    * checkpoint reads it as `unknown` and narrows at its own boundary.
    */
-  readonly cursor?: Watermark;
+  readonly cursor?: Cursor;
   /**
    * When this round must be finished, as epoch milliseconds.
    *
@@ -361,11 +361,11 @@ export interface SourceContext<C = Record<string, unknown>> extends ExtensionCon
 export interface TroveSource<C = Record<string, unknown>> {
   /**
    * The batch entry point. Fetches new content and returns documents to
-   * index, optionally with a new cursor. May return a bare `SourceDocument[]`
+   * index, optionally with a new cursor. May return a bare `Document[]`
    * for convenience. Throw a plain `Error` to fail the run (the Mac app records
    * the error and retries next tick).
    */
-  sync(ctx: SourceContext<C>): Promise<SourceSyncResult | SourceDocument[]>;
+  sync(ctx: SourceContext<C>): Promise<SourceSyncResult | Document[]>;
 }
 
 /**

@@ -12,7 +12,7 @@
  * @module
  */
 
-import type { SourceContext, SourceDocument, SourceSyncResult, TroveSource } from './types.js';
+import type { Document, SourceContext, SourceSyncResult, TroveSource } from './types.js';
 
 /**
  * Validate and return a source definition unchanged.
@@ -57,7 +57,7 @@ export function defineSource<C = Record<string, unknown>>(source: TroveSource<C>
  * @returns A validated {@link TroveSource} wrapping `sync`.
  */
 export function defineSync<C = Record<string, unknown>>(
-  sync: (ctx: SourceContext<C>) => Promise<SourceSyncResult | SourceDocument[]>,
+  sync: (ctx: SourceContext<C>) => Promise<SourceSyncResult | Document[]>,
 ): TroveSource<C> {
   return defineSource<C>({ sync });
 }

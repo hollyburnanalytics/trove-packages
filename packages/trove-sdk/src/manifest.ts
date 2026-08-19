@@ -23,7 +23,7 @@
  *    and, for a source that has code, against the subset built today
  *    ({@link MVP}).
  * 4. **Where it runs** — `location`, plus the cloud-eligibility predicate that
- *    a cloud source has to satisfy ({@link LOCATIONS}).
+ *    a cloud source has to satisfy ({@link RUNS_IN}).
  * 5. **The optional declarations** — `schedule`, `fanOut`, `formatting`, and
  *    the per-field `directory` descriptors.
  *
@@ -75,7 +75,7 @@ const SEMVER_RE = /^\d+\.\d+\.\d+(?:[-+].+)?$/;
 //
 // Four orthogonal manifest fields describe a source's collection contract:
 // `kind` (which entrypoint the harness calls), `transport` (how it reaches the
-// data), `watermark` (how it resumes), and `documentSemantics` (what ingest
+// data), `cursor` (how it resumes), and `ingest` (what ingest
 // does with what it returns). Every value each may take is declared here, so
 // the design is whole and forward-compatible — a source that is still a stub
 // may name a value that is not built yet, to record where its shape is headed.
@@ -138,8 +138,8 @@ export interface ManifestValidationOptions {
    * Whether the source has code.
    *
    * Passing this at all means the manifest is being **admitted to a catalog**,
-   * where a source that has not declared its `kind`, `transport`, `watermark`,
-   * `documentSemantics` and `location` is incomplete — so those five become
+   * where a source that has not declared its `kind`, `transport`, `cursor`,
+   * `ingest` and `location` is incomplete — so those five become
    * required. Omitting it is authoring mode: whatever is declared is checked,
    * and what has not been written yet is not an error, so validation stays
    * useful while a source is being built.
@@ -216,8 +216,8 @@ export function validateSourceManifest(
     }
   }
 
-  if (manifest.needs_browser !== undefined && typeof manifest.needs_browser !== 'boolean') {
-    errors.push('manifest.needs_browser must be a boolean');
+  if (manifest.needsBrowser !== undefined && typeof manifest.needsBrowser !== 'boolean') {
+    errors.push('manifest.needsBrowser must be a boolean');
   }
 
   checkTypeFields(manifest, required, implemented, errors);
@@ -231,27 +231,27 @@ export function validateSourceManifest(
 
 export {
   CLOUD_ELIGIBLE_TRANSPORTS,
+  CURSOR_STRATEGIES,
+  type CursorStrategy,
   DIRECTORY_AUTH_STRATEGIES,
   DIRECTORY_MODES,
   type DirectoryAuthStrategy,
   type DirectoryMode,
-  DOCUMENT_SEMANTICS,
-  type DocumentSemantics,
   FAN_OUT_FIELD_TYPES,
   type FanOutFieldType,
   FORMATTING,
   type FormattingPolicy,
-  LOCATIONS,
+  INGEST_MODES,
+  type IngestMode,
   MVP,
-  MVP_DEPLOYED_WATERMARKS,
+  MVP_DEPLOYED_CURSORS,
+  RUNS_IN,
+  type RunsIn,
   SOURCE_KINDS,
   SOURCE_TYPE_FIELDS,
   type SourceKind,
-  type SourceLocation,
   type SourceSchedule,
   type SourceTransport,
   TRANSPORTS,
   VALID_SCHEDULES,
-  WATERMARK_STRATEGIES,
-  type WatermarkStrategy,
 } from './taxonomy.js';

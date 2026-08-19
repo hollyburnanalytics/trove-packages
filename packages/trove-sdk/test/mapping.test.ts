@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { defineSource } from '../src/define.js';
 import { runSource } from '../src/runtime.js';
-import type { SourceDocument } from '../src/types.js';
+import type { Document } from '../src/types.js';
 
 /**
  * The `IngestDocumentInput` wire shape (schema.graphql). `externalId` is the only
- * required field; the rest are optional. This is what a `SourceDocument` maps
+ * required field; the rest are optional. This is what a `Document` maps
  * 1:1 onto when the Mac app pushes it via `ingestDocuments`.
  */
 interface IngestDocumentInput {
@@ -22,12 +22,12 @@ interface IngestDocumentInput {
 }
 
 /** The mapping the Mac app applies: `id` → `externalId`, everything else identical. */
-function toIngestInput(doc: SourceDocument): IngestDocumentInput {
+function toIngestInput(doc: Document): IngestDocumentInput {
   const { id, ...rest } = doc;
   return { externalId: id, ...rest };
 }
 
-describe('SourceDocument → IngestDocumentInput mapping', () => {
+describe('Document → IngestDocumentInput mapping', () => {
   it('maps id to externalId and carries every other field 1:1', async () => {
     const source = defineSource({
       async sync() {
@@ -48,7 +48,7 @@ describe('SourceDocument → IngestDocumentInput mapping', () => {
     });
 
     const { documents } = await runSource(source);
-    const input = toIngestInput(documents[0] as SourceDocument);
+    const input = toIngestInput(documents[0] as Document);
 
     expect(input).toEqual({
       externalId: 'guid-123',
@@ -81,7 +81,7 @@ describe('SourceDocument → IngestDocumentInput mapping', () => {
     });
 
     const { documents } = await runSource(source);
-    const input = toIngestInput(documents[0] as SourceDocument);
+    const input = toIngestInput(documents[0] as Document);
     expect(input.externalId).toBe('ep-7');
     expect(input.audioUrl).toBe('https://cdn.example.com/ep7.mp3');
     expect(input.text).toBeUndefined();

@@ -64,6 +64,7 @@
  * @module
  */
 
+export { stringList } from './config.js';
 export { defineSource, defineSync } from './define.js';
 export {
   assertPublicHttpUrl,

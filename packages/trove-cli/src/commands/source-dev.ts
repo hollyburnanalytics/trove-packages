@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { basename, isAbsolute, join, resolve } from 'node:path';
-import { runSource, type SourceDocument, validateSourceManifest } from '@ontrove/sdk';
+import { type Document, runSource, validateSourceManifest } from '@ontrove/sdk';
 import type { CommandContext } from '../context.js';
 import { ExitCode, usageError } from '../errors.js';
 import { flag, type ParsedArgs } from '../lib/args.js';
@@ -181,7 +181,7 @@ export async function dev(
 }
 
 /** Render a source-document preview table. */
-function formatDocs(ctx: CommandContext, docs: SourceDocument[]): string {
+function formatDocs(ctx: CommandContext, docs: Document[]): string {
   if (docs.length === 0) return ctx.style.dim('No documents.');
   const rows = docs.map((d) => [
     d.id,

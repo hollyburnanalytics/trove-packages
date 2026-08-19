@@ -4,7 +4,7 @@
  *
  * Separated from the rules that validate a manifest because they answer
  * different questions and change at different times. This file says what the
- * words ARE — a new transport, a new watermark strategy, a schedule Trove will
+ * words ARE — a new transport, a new cursor strategy, a schedule Trove will
  * honour — and is the list a client renders or a catalog tests against.
  * `manifest.ts` says what makes a manifest VALID, and imports these.
  *
@@ -68,10 +68,10 @@ export type SourceTransport = (typeof TRANSPORTS)[number];
  * run anything), never the reverse — a source that needs a browser or a local
  * file cannot be hoisted into a runtime that has neither.
  */
-export const LOCATIONS = ['cloud', 'client'] as const;
+export const RUNS_IN = ['cloud', 'mac'] as const;
 
-/** One of {@link LOCATIONS}. */
-export type SourceLocation = (typeof LOCATIONS)[number];
+/** One of {@link RUNS_IN}. */
+export type RunsIn = (typeof RUNS_IN)[number];
 
 /**
  * The transports whose sync is a pure HTTP pull — the necessary condition for a
@@ -119,10 +119,10 @@ export type DirectoryAuthStrategy = (typeof DIRECTORY_AUTH_STRATEGIES)[number];
 /**
  * The resume strategy a source declares; the value itself lives in the feed's
  * cursor between runs. `date`, `idSet` and `none` are the three the SDK's
- * `Watermark` type carries today; the rest are declared shapes for feeds that
+ * `Cursor` type carries today; the rest are declared shapes for feeds that
  * resume by token, by row, or by whole-snapshot comparison.
  */
-export const WATERMARK_STRATEGIES = [
+export const CURSOR_STRATEGIES = [
   'date',
   'idSet',
   'none',
@@ -133,18 +133,18 @@ export const WATERMARK_STRATEGIES = [
   'rowid',
 ] as const;
 
-/** One of {@link WATERMARK_STRATEGIES}. */
-export type WatermarkStrategy = (typeof WATERMARK_STRATEGIES)[number];
+/** One of {@link CURSOR_STRATEGIES}. */
+export type CursorStrategy = (typeof CURSOR_STRATEGIES)[number];
 
 /**
  * What ingest does with the documents a run returns. `append` adds what is new
  * and leaves what is stored alone; `upsert` lets a later run replace an earlier
  * document with the same id.
  */
-export const DOCUMENT_SEMANTICS = ['append', 'upsert'] as const;
+export const INGEST_MODES = ['append', 'upsert'] as const;
 
-/** One of {@link DOCUMENT_SEMANTICS}. */
-export type DocumentSemantics = (typeof DOCUMENT_SEMANTICS)[number];
+/** One of {@link INGEST_MODES}. */
+export type IngestMode = (typeof INGEST_MODES)[number];
 
 /**
  * Whether Trove reformats a source's documents into clean Markdown on ingest,
@@ -182,17 +182,17 @@ export type FormattingPolicy = (typeof FORMATTING)[number];
 export const MVP: {
   readonly kinds: readonly SourceKind[];
   readonly transports: readonly SourceTransport[];
-  readonly watermarks: readonly WatermarkStrategy[];
-  readonly documentSemantics: readonly DocumentSemantics[];
+  readonly cursors: readonly CursorStrategy[];
+  readonly ingest: readonly IngestMode[];
 } = {
   kinds: ['scheduled-sync'],
   transports: ['feed', 'scrape', 'api', 'browser', 'local'],
-  watermarks: ['date', 'idSet', 'none'],
-  documentSemantics: ['append'],
+  cursors: ['date', 'idSet', 'none'],
+  ingest: ['append'],
 };
 
 /**
- * The watermark strategies a `runtime: deployed` source may additionally use.
+ * The cursor strategies a `runtime: deployed` source may additionally use.
  *
  * The cut is not one list, because the two runtimes genuinely differ here and
  * pretending otherwise is what produced a shipped manifest declaring a strategy
@@ -204,7 +204,7 @@ export const MVP: {
  * me everything after this" — works today, and one does.
  *
  * A BUNDLED source's cursor is parsed before it is handed over, and a shape the
- * {@link Watermark} union does not name parses to nothing. The same source
+ * {@link Cursor} union does not name parses to nothing. The same source
  * compiled into the cloud runtime would silently start from the beginning on
  * every run, which is why `highWaterId` is NOT in {@link MVP} and a bundled
  * source declaring it is refused.
@@ -213,10 +213,7 @@ export const MVP: {
  * difference between a source that resumes and one that re-reads a metered API
  * from the top, forever, without an error anywhere.
  */
-export const MVP_DEPLOYED_WATERMARKS: readonly WatermarkStrategy[] = [
-  ...MVP.watermarks,
-  'highWaterId',
-];
+export const MVP_DEPLOYED_CURSORS: readonly CursorStrategy[] = [...MVP.cursors, 'highWaterId'];
 
 /**
  * The four type-system fields with their full vocabularies, keyed by field
@@ -227,11 +224,11 @@ export const MVP_DEPLOYED_WATERMARKS: readonly WatermarkStrategy[] = [
 export const SOURCE_TYPE_FIELDS: {
   readonly kind: readonly SourceKind[];
   readonly transport: readonly SourceTransport[];
-  readonly watermark: readonly WatermarkStrategy[];
-  readonly documentSemantics: readonly DocumentSemantics[];
+  readonly cursor: readonly CursorStrategy[];
+  readonly ingest: readonly IngestMode[];
 } = {
   kind: SOURCE_KINDS,
   transport: TRANSPORTS,
-  watermark: WATERMARK_STRATEGIES,
-  documentSemantics: DOCUMENT_SEMANTICS,
+  cursor: CURSOR_STRATEGIES,
+  ingest: INGEST_MODES,
 };

@@ -4,7 +4,7 @@
  *
  * {@link runSource} builds a {@link SourceContext} from a `{ config, cursor }`
  * spec, invokes `sync(ctx)`, then normalizes and validates the result: it accepts
- * either a `SourceSyncResult` or a bare `SourceDocument[]`, deduplicates by
+ * either a `SourceSyncResult` or a bare `Document[]`, deduplicates by
  * `id` (first occurrence wins, matching server-side `(feed, id)` dedup), and
  * validates every document's required fields, surfacing problems clearly instead
  * of pushing a malformed payload to the cloud.
@@ -17,13 +17,13 @@
  */
 
 import type {
+  Cursor,
+  Document,
   FetchLike,
   LogChannel,
   SourceContext,
-  SourceDocument,
   SourceSyncResult,
   TroveSource,
-  Watermark,
 } from './types.js';
 
 /** Allowed `contentType` values (matches the GraphQL `ContentType` enum). */
@@ -39,8 +39,8 @@ const CONTENT_TYPES: readonly string[] = ['text', 'transcript', 'highlight', 'bo
 export interface RunOptions<C = Record<string, unknown>> {
   /** The source's preference values (no credentials). Defaults to `{}`. */
   config?: C;
-  /** The feed's current watermark. Defaults to `{ type: 'none' }`. */
-  cursor?: Watermark;
+  /** The feed's current cursor. Defaults to `{ type: 'none' }`. */
+  cursor?: Cursor;
   /** The fetch implementation to expose as `ctx.fetch`. Defaults to global `fetch`. */
   fetchImpl?: FetchLike;
   /** A sink for `ctx.log(...)` calls. Defaults to collecting into the returned `logs`. */
@@ -68,7 +68,7 @@ export interface RunOptions<C = Record<string, unknown>> {
  */
 export interface RunResult {
   /** The validated, deduped documents `sync` returned. */
-  documents: SourceDocument[];
+  documents: Document[];
   /**
    * The cursor `sync` returned, or `{ type: 'none' }` if it returned none.
    *
@@ -80,13 +80,13 @@ export interface RunResult {
    *
    * That erasure is safe only as long as every consumer treats the value as
    * advisory rather than as a cursor to store. A host that stringifies this
-   * straight into a feed's watermark replaces a real position with a blank
-   * one, and no watermark strategy re-offers what is behind it — so the feed
+   * straight into a feed's cursor replaces a real position with a blank
+   * one, and no cursor strategy re-offers what is behind it — so the feed
    * does not restart, it skips forward permanently, quietly, on a run that
    * looks clean. Trove's platform makes that decision in one predicate
-   * (`isAdvancingWatermark`); a host embedding this runtime needs its own.
+   * (`isAdvancingCursor`); a host embedding this runtime needs its own.
    */
-  cursor: Watermark;
+  cursor: Cursor;
   /** Captured `ctx.log(...)` lines (when no custom `logSink` was supplied). */
   logs: unknown[][];
   /** Count of documents dropped as duplicates of an earlier `id`. */
@@ -108,7 +108,7 @@ export interface RunResult {
  * @param index - Its position in the returned array, for the message.
  * @throws {Error} If a required field is missing or malformed.
  */
-function validateDocument(doc: SourceDocument, index: number): void {
+function validateDocument(doc: Document, index: number): void {
   const where = `document[${String(index)}]`;
   if (doc === null || typeof doc !== 'object') {
     throw new Error(`${where} must be an object`);
@@ -139,7 +139,7 @@ function validateDocument(doc: SourceDocument, index: number): void {
  * @returns A normalized `{ documents, cursor? }` result.
  * @throws {Error} If the value is neither an array nor a `{ documents }` object.
  */
-function normalizeResult(value: SourceSyncResult | SourceDocument[] | undefined): SourceSyncResult {
+function normalizeResult(value: SourceSyncResult | Document[] | undefined): SourceSyncResult {
   // An adapter whose only job is to no-op sometimes falls off the end of the
   // function. That is an empty run, not a malformed one — refusing it breaks a
   // working source over a style detail, and the deployed runtimes have always
@@ -171,12 +171,12 @@ function normalizeResult(value: SourceSyncResult | SourceDocument[] | undefined)
  * @param documents - The validated documents.
  * @returns The deduped documents and the count dropped.
  */
-function dedup(documents: SourceDocument[]): {
-  unique: SourceDocument[];
+function dedup(documents: Document[]): {
+  unique: Document[];
   duplicatesSkipped: number;
 } {
   const seen = new Set<string>();
-  const unique: SourceDocument[] = [];
+  const unique: Document[] = [];
   let duplicatesSkipped = 0;
   for (const doc of documents) {
     if (seen.has(doc.id)) {
@@ -217,7 +217,7 @@ export async function runSource<C = Record<string, unknown>>(
   // look like a resume from a position nobody stored. The invoke contract says
   // the same in its own words ("a wire null cursor becomes undefined"), and
   // Trove's own runtime has always passed `undefined` through.
-  const cursor: Watermark | undefined = options.cursor;
+  const cursor: Cursor | undefined = options.cursor;
   const fetchImpl: FetchLike =
     options.fetchImpl ??
     ((url: string | URL, init?: RequestInit): Promise<Response> => globalThis.fetch(url, init));

@@ -1,10 +1,10 @@
-import type { SourceDocument, Watermark } from '@ontrove/sdk';
+import type { Cursor, Document } from '@ontrove/sdk';
 import { describe, expect, it } from 'vitest';
 import { parseCursor, serializeCursor, toIngestInput } from '../src/lib/source.js';
 
 describe('toIngestInput', () => {
   it('maps a full document onto the wire shape (id → externalId)', () => {
-    const doc: SourceDocument = {
+    const doc: Document = {
       id: 'ext-1',
       title: 't',
       text: 'body',
@@ -40,9 +40,9 @@ describe('serializeCursor', () => {
     expect(serializeCursor({ type: 'date', value: '2026-01-01' })).toBe(
       JSON.stringify({ type: 'date', value: '2026-01-01' }),
     );
-    // `max` is the numeric cap on retained ids, not an id — see the Watermark
+    // `max` is the numeric cap on retained ids, not an id — see the Cursor
     // wire contract in @ontrove/sdk.
-    const idSet: Watermark = { type: 'idSet', values: ['1', '2'], max: 2 };
+    const idSet: Cursor = { type: 'idSet', values: ['1', '2'], max: 2 };
     expect(serializeCursor(idSet)).toBe(JSON.stringify(idSet));
   });
 });

@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
   CLOUD_ELIGIBLE_TRANSPORTS,
+  CURSOR_STRATEGIES,
   DIRECTORY_MODES,
-  DOCUMENT_SEMANTICS,
   FAN_OUT_FIELD_TYPES,
   FORMATTING,
+  INGEST_MODES,
   isCredentialConfigKey,
-  LOCATIONS,
   MVP,
+  RUNS_IN,
   SOURCE_KINDS,
   SOURCE_TYPE_FIELDS,
   TRANSPORTS,
   VALID_SCHEDULES,
   validateSourceManifest,
-  WATERMARK_STRATEGIES,
 } from '../src/manifest.js';
 
 /** A clean, fully-declared manifest fixture — what a shipping source looks like. */
@@ -28,13 +28,13 @@ function clean(): Record<string, unknown> {
     schedule: 'every 6 hours',
     kind: 'scheduled-sync',
     transport: 'api',
-    watermark: 'date',
-    documentSemantics: 'append',
-    location: 'cloud',
+    cursor: 'date',
+    ingest: 'append',
+    runsIn: 'cloud',
     config: {
       username: { label: 'HN Username', type: 'text', placeholder: 'pg' },
     },
-    needs_browser: false,
+    needsBrowser: false,
   };
 }
 
@@ -63,7 +63,7 @@ describe('validateSourceManifest — accepts clean manifests', () => {
   it('accepts a live-only manifest with schedule: null', () => {
     const m = clean();
     m.schedule = null;
-    m.location = 'client';
+    m.runsIn = 'mac';
     expect(validateSourceManifest(m).valid).toBe(true);
   });
 
@@ -138,10 +138,10 @@ describe('validateSourceManifest — shape errors', () => {
     expect(errorsOf(m)).toMatch(/manifest.config.username must be a field descriptor object/);
   });
 
-  it('rejects a non-boolean needs_browser', () => {
+  it('rejects a non-boolean needsBrowser', () => {
     const m = clean();
-    m.needs_browser = 'yes';
-    expect(errorsOf(m)).toMatch(/needs_browser must be a boolean/);
+    m.needsBrowser = 'yes';
+    expect(errorsOf(m)).toMatch(/needsBrowser must be a boolean/);
   });
 });
 
@@ -154,15 +154,15 @@ describe('validateSourceManifest — the type-system fields', () => {
     for (const value of TRANSPORTS) expect(message).toContain(value);
   });
 
-  it('rejects an unknown kind, watermark and documentSemantics', () => {
+  it('rejects an unknown kind, cursor and ingest', () => {
     const m = clean();
     m.kind = 'feed';
-    m.watermark = 'whenever';
-    m.documentSemantics = 'text';
+    m.cursor = 'whenever';
+    m.ingest = 'text';
     const message = errorsOf(m);
     expect(message).toMatch(/manifest.kind "feed" is not a known execution kind/);
-    expect(message).toMatch(/manifest.watermark "whenever" is not a known watermark strategy/);
-    expect(message).toMatch(/manifest.documentSemantics "text" is not a known ingest behaviour/);
+    expect(message).toMatch(/manifest.cursor "whenever" is not a known cursor strategy/);
+    expect(message).toMatch(/manifest.ingest "text" is not a known ingest behaviour/);
   });
 
   it('reports a non-string value as it appeared in the JSON', () => {
@@ -173,19 +173,19 @@ describe('validateSourceManifest — the type-system fields', () => {
 
   it('lets a stub declare a reserved value it has not built yet', () => {
     const m = clean();
-    m.watermark = 'opaqueToken';
-    m.documentSemantics = 'upsert';
+    m.cursor = 'opaqueToken';
+    m.ingest = 'upsert';
     expect(validateSourceManifest(m, { implemented: false }).valid).toBe(true);
   });
 
   it('holds a source with code to the values that run today', () => {
     const m = clean();
-    m.watermark = 'opaqueToken';
+    m.cursor = 'opaqueToken';
     const message = errorsOf(m, { implemented: true });
     expect(message).toMatch(
-      /manifest.watermark "opaqueToken" is a reserved watermark strategy that nothing runs yet/,
+      /manifest.cursor "opaqueToken" is a reserved cursor strategy that nothing runs yet/,
     );
-    for (const value of MVP.watermarks) expect(message).toContain(value);
+    for (const value of MVP.cursors) expect(message).toContain(value);
   });
 
   it('requires all four declarations plus location for a catalog entry', () => {
@@ -193,7 +193,7 @@ describe('validateSourceManifest — the type-system fields', () => {
     for (const field of Object.keys(SOURCE_TYPE_FIELDS)) {
       expect(message).toContain(`manifest.${field} is required`);
     }
-    expect(message).toContain('manifest.location is required');
+    expect(message).toContain('manifest.runsIn is required');
   });
 
   it('does not require them while authoring', () => {
@@ -204,16 +204,16 @@ describe('validateSourceManifest — the type-system fields', () => {
     const m = clean();
     m.document_semantics = 'append';
     expect(errorsOf(m)).toMatch(
-      /manifest.document_semantics is the former name of manifest.documentSemantics/,
+      /manifest.document_semantics is the former name of manifest.ingest/,
     );
   });
 });
 
-describe('validateSourceManifest — location and cloud eligibility', () => {
-  it('rejects an unknown location', () => {
+describe('validateSourceManifest — runsIn and cloud eligibility', () => {
+  it('rejects an unknown runsIn', () => {
     const m = clean();
-    m.location = 'edge';
-    expect(errorsOf(m)).toMatch(/manifest.location "edge" is not a known location/);
+    m.runsIn = 'edge';
+    expect(errorsOf(m)).toMatch(/manifest.runsIn "edge" is not a known location/);
   });
 
   it('rejects a cloud source whose transport cannot run there', () => {
@@ -222,7 +222,7 @@ describe('validateSourceManifest — location and cloud eligibility', () => {
       const m = clean();
       m.transport = transport;
       expect(errorsOf(m)).toMatch(
-        /manifest.location "cloud" requires manifest.transport to be one of/,
+        /manifest.runsIn "cloud" requires manifest.transport to be one of/,
       );
     }
   });
@@ -237,8 +237,8 @@ describe('validateSourceManifest — location and cloud eligibility', () => {
 
   it('rejects a cloud source that needs a browser', () => {
     const m = clean();
-    m.needs_browser = true;
-    expect(errorsOf(m)).toMatch(/incompatible with manifest.needs_browser: true/);
+    m.needsBrowser = true;
+    expect(errorsOf(m)).toMatch(/incompatible with manifest.needsBrowser: true/);
   });
 
   it('rejects a cloud source scheduled on demand', () => {
@@ -247,11 +247,11 @@ describe('validateSourceManifest — location and cloud eligibility', () => {
     expect(errorsOf(m)).toMatch(/incompatible with manifest.schedule "on demand"/);
   });
 
-  it('lets the client run anything', () => {
+  it('lets a Mac run anything', () => {
     const m = clean();
-    m.location = 'client';
+    m.runsIn = 'mac';
     m.transport = 'browser';
-    m.needs_browser = true;
+    m.needsBrowser = true;
     m.schedule = 'on demand';
     expect(validateSourceManifest(m).valid).toBe(true);
   });
@@ -261,7 +261,7 @@ describe('validateSourceManifest — schedule', () => {
   it('accepts every documented cadence', () => {
     for (const schedule of VALID_SCHEDULES) {
       const m = clean();
-      m.location = 'client';
+      m.runsIn = 'mac';
       m.schedule = schedule;
       expect(validateSourceManifest(m).valid).toBe(true);
     }
@@ -390,9 +390,9 @@ describe('validateSourceManifest — reports every problem at once', () => {
         version: 'v1',
         kind: 'feed',
         transport: 'browser',
-        watermark: 'date',
-        documentSemantics: 'append',
-        location: 'cloud',
+        cursor: 'date',
+        ingest: 'append',
+        runsIn: 'cloud',
         schedule: 'hourly',
         formatting: 'pretty',
       },
@@ -407,8 +407,8 @@ describe('the exported vocabulary', () => {
   it('keeps the MVP cut a subset of each full vocabulary', () => {
     for (const value of MVP.kinds) expect(SOURCE_KINDS).toContain(value);
     for (const value of MVP.transports) expect(TRANSPORTS).toContain(value);
-    for (const value of MVP.watermarks) expect(WATERMARK_STRATEGIES).toContain(value);
-    for (const value of MVP.documentSemantics) expect(DOCUMENT_SEMANTICS).toContain(value);
+    for (const value of MVP.cursors) expect(CURSOR_STRATEGIES).toContain(value);
+    for (const value of MVP.ingest) expect(INGEST_MODES).toContain(value);
   });
 
   it('keeps the cloud-eligible transports a subset of the transports', () => {
@@ -416,20 +416,15 @@ describe('the exported vocabulary', () => {
   });
 
   it('exposes the four type-system fields with their vocabularies', () => {
-    expect(Object.keys(SOURCE_TYPE_FIELDS)).toEqual([
-      'kind',
-      'transport',
-      'watermark',
-      'documentSemantics',
-    ]);
+    expect(Object.keys(SOURCE_TYPE_FIELDS)).toEqual(['kind', 'transport', 'cursor', 'ingest']);
     expect(SOURCE_TYPE_FIELDS.kind).toBe(SOURCE_KINDS);
     expect(SOURCE_TYPE_FIELDS.transport).toBe(TRANSPORTS);
-    expect(SOURCE_TYPE_FIELDS.watermark).toBe(WATERMARK_STRATEGIES);
-    expect(SOURCE_TYPE_FIELDS.documentSemantics).toBe(DOCUMENT_SEMANTICS);
+    expect(SOURCE_TYPE_FIELDS.cursor).toBe(CURSOR_STRATEGIES);
+    expect(SOURCE_TYPE_FIELDS.ingest).toBe(INGEST_MODES);
   });
 
-  it('offers exactly two locations, since the eligibility rule is one-way', () => {
-    expect([...LOCATIONS]).toEqual(['cloud', 'client']);
+  it('offers exactly two places to run, since the eligibility rule is one-way', () => {
+    expect([...RUNS_IN]).toEqual(['cloud', 'mac']);
   });
 });
 
@@ -465,8 +460,8 @@ describe('the cut a deployed source is held to', () => {
     version: '1.0.0',
     kind: 'scheduled-sync',
     transport: 'api',
-    documentSemantics: 'append',
-    location: 'cloud',
+    ingest: 'append',
+    runsIn: 'cloud',
     schedule: 'daily',
   };
 
@@ -475,7 +470,7 @@ describe('the cut a deployed source is held to', () => {
     // shipped source has been using it, declaring a value in no vocabulary
     // because the cut had no way to say "deployed only".
     const result = validateSourceManifest(
-      { ...base, watermark: 'highWaterId', runtime: 'deployed' },
+      { ...base, cursor: 'highWaterId', runtime: 'deployed' },
       { implemented: true },
     );
     expect(result.errors).toEqual([]);
@@ -488,7 +483,7 @@ describe('the cut a deployed source is held to', () => {
     // run, silently. The message has to carry that, because "reserved" alone
     // reads as "coming soon" rather than "this would break".
     const result = validateSourceManifest(
-      { ...base, watermark: 'highWaterId' },
+      { ...base, cursor: 'highWaterId' },
       { implemented: true },
     );
     expect(result.valid).toBe(false);
@@ -498,10 +493,10 @@ describe('the cut a deployed source is held to', () => {
 
   it('still refuses a value from no vocabulary at all', () => {
     const result = validateSourceManifest(
-      { ...base, watermark: 'id', runtime: 'deployed' },
+      { ...base, cursor: 'id', runtime: 'deployed' },
       { implemented: true },
     );
     expect(result.valid).toBe(false);
-    expect(result.errors[0]).toMatch(/is not a known watermark strategy/);
+    expect(result.errors[0]).toMatch(/is not a known cursor strategy/);
   });
 });

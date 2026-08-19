@@ -16,17 +16,17 @@
 import { isCredentialConfigKey } from './manifest.js';
 import {
   CLOUD_ELIGIBLE_TRANSPORTS,
+  CURSOR_STRATEGIES,
   DIRECTORY_MODES,
-  DOCUMENT_SEMANTICS,
   FAN_OUT_FIELD_TYPES,
   FORMATTING,
-  LOCATIONS,
+  INGEST_MODES,
   MVP,
-  MVP_DEPLOYED_WATERMARKS,
+  MVP_DEPLOYED_CURSORS,
+  RUNS_IN,
   SOURCE_KINDS,
   TRANSPORTS,
   VALID_SCHEDULES,
-  WATERMARK_STRATEGIES,
 } from './taxonomy.js';
 
 /**
@@ -35,7 +35,7 @@ import {
  */
 interface TypeFieldRule {
   /** The manifest field name. */
-  readonly field: 'kind' | 'transport' | 'watermark' | 'documentSemantics';
+  readonly field: 'kind' | 'transport' | 'cursor' | 'ingest';
   /** Every value the field may take. */
   readonly allowed: readonly string[];
   /** The subset a source with code must stay inside. */
@@ -49,15 +49,15 @@ const TYPE_FIELD_RULES: readonly TypeFieldRule[] = [
   { field: 'kind', allowed: SOURCE_KINDS, built: MVP.kinds, noun: 'execution kind' },
   { field: 'transport', allowed: TRANSPORTS, built: MVP.transports, noun: 'transport' },
   {
-    field: 'watermark',
-    allowed: WATERMARK_STRATEGIES,
-    built: MVP.watermarks,
-    noun: 'watermark strategy',
+    field: 'cursor',
+    allowed: CURSOR_STRATEGIES,
+    built: MVP.cursors,
+    noun: 'cursor strategy',
   },
   {
-    field: 'documentSemantics',
-    allowed: DOCUMENT_SEMANTICS,
-    built: MVP.documentSemantics,
+    field: 'ingest',
+    allowed: INGEST_MODES,
+    built: MVP.ingest,
     noun: 'ingest behaviour',
   },
 ];
@@ -123,9 +123,9 @@ function reservedValueError(refusal: {
 }): string {
   const { field, value, noun, built, isDeployed } = refusal;
   const runsWhenDeployed =
-    field === 'watermark' &&
+    field === 'cursor' &&
     !isDeployed &&
-    (MVP_DEPLOYED_WATERMARKS as readonly string[]).includes(value);
+    (MVP_DEPLOYED_CURSORS as readonly string[]).includes(value);
   if (runsWhenDeployed) {
     return (
       `manifest.${field} "${value}" is a reserved ${noun} on the bundled runtime, which PARSES ` +
@@ -161,10 +161,10 @@ export function checkTypeFields(
   // A deployed source's cursor is handed back byte-for-byte, so it may resume
   // from a monotonic id; a bundled one's is parsed, and a shape the union does
   // not name parses to nothing. Same field, two answers — see
-  // MVP_DEPLOYED_WATERMARKS.
+  // MVP_DEPLOYED_CURSORS.
   const isDeployed = manifest.runtime === 'deployed';
   for (const { field, allowed, built: cut, noun } of TYPE_FIELD_RULES) {
-    const built = field === 'watermark' && isDeployed ? MVP_DEPLOYED_WATERMARKS : cut;
+    const built = field === 'cursor' && isDeployed ? MVP_DEPLOYED_CURSORS : cut;
     const value = manifest[field];
     if (value === undefined) {
       if (required) {
@@ -184,7 +184,7 @@ export function checkTypeFields(
   }
   if (manifest.document_semantics !== undefined) {
     errors.push(
-      `manifest.document_semantics is the former name of manifest.documentSemantics; rename it (one of: ${DOCUMENT_SEMANTICS.join(', ')})`,
+      `manifest.document_semantics is the former name of manifest.ingest; rename it (one of: ${INGEST_MODES.join(', ')})`,
     );
   }
 }
@@ -213,18 +213,18 @@ export function checkLocation(
   required: boolean,
   errors: string[],
 ): void {
-  const location = manifest.location;
+  const location = manifest.runsIn;
   if (location === undefined) {
     if (required) {
       errors.push(
-        `manifest.location is required — where the source runs by default, one of: ${LOCATIONS.join(', ')}`,
+        `manifest.runsIn is required — where the source runs by default, one of: ${RUNS_IN.join(', ')}`,
       );
     }
     return;
   }
-  if (!isOneOf(LOCATIONS, location)) {
+  if (!isOneOf(RUNS_IN, location)) {
     errors.push(
-      `manifest.location ${show(location)} is not a known location (expected one of: ${LOCATIONS.join(', ')})`,
+      `manifest.runsIn ${show(location)} is not a known location (expected one of: ${RUNS_IN.join(', ')})`,
     );
     return;
   }
@@ -233,17 +233,17 @@ export function checkLocation(
   const transport = manifest.transport;
   if (!isOneOf(CLOUD_ELIGIBLE_TRANSPORTS, transport)) {
     errors.push(
-      `manifest.location "cloud" requires manifest.transport to be one of: ${CLOUD_ELIGIBLE_TRANSPORTS.join(', ')} (got ${show(transport)})`,
+      `manifest.runsIn "cloud" requires manifest.transport to be one of: ${CLOUD_ELIGIBLE_TRANSPORTS.join(', ')} (got ${show(transport)})`,
     );
   }
-  if (manifest.needs_browser === true) {
+  if (manifest.needsBrowser === true) {
     errors.push(
-      'manifest.location "cloud" is incompatible with manifest.needs_browser: true — there is no browser in a hosted runtime; use "client"',
+      'manifest.runsIn "cloud" is incompatible with manifest.needsBrowser: true — there is no browser in a hosted runtime; use "mac"',
     );
   }
   if (manifest.schedule === 'on demand') {
     errors.push(
-      'manifest.location "cloud" is incompatible with manifest.schedule "on demand" — nothing in the cloud triggers an on-demand source; use "client" or name a cadence',
+      'manifest.runsIn "cloud" is incompatible with manifest.schedule "on demand" — nothing in the cloud triggers an on-demand source; use "mac" or name a cadence',
     );
   }
 }

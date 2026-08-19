@@ -117,8 +117,8 @@
       }
     },
     {
-      "name": "a typed watermark cursor arrives byte-identical",
-      "why": "`src/features/ingest/watermark.ts` and the adapter's own writer describe the SAME object, not merely the same bytes — `idSet.max` is the retention CAP (a count), not the highest id. A runtime that re-shaped the cursor in transit would make the two types disagree in a way no test on either side could see.",
+      "name": "a typed cursor arrives byte-identical",
+      "why": "`src/features/ingest/cursor.ts` and the adapter's own writer describe the SAME object, not merely the same bytes — `idSet.max` is the retention CAP (a count), not the highest id. A runtime that re-shaped the cursor in transit would make the two types disagree in a way no test on either side could see.",
       "request": {
         "cursor": {
           "type": "idSet",
@@ -249,7 +249,7 @@
     },
     {
       "name": "a null cursor means KEEP THE PRIOR ONE, end to end",
-      "why": "THE case. A shim writing `cursor: ctx.cursor ?? null` emits null on every first run, so null crosses the wire constantly. Reading it as 'clear the cursor' blanks the watermark and re-fetches the whole feed next sync — a bill on a metered source, a silent duplicate ingest on any of them. Null is allowed ON the wire and dropped by the reader; an adapter that really wants to restart says so by resetting the feed cursor, which is an operator action with a name. Emitting `cursor: null` and omitting the key are the SAME statement, because the reader drops null either way — so both are conformant here, and an implementation is not wrong for choosing the tidier one.",
+      "why": "THE case. A shim writing `cursor: ctx.cursor ?? null` emits null on every first run, so null crosses the wire constantly. Reading it as 'clear the cursor' blanks the cursor and re-fetches the whole feed next sync — a bill on a metered source, a silent duplicate ingest on any of them. Null is allowed ON the wire and dropped by the reader; an adapter that really wants to restart says so by resetting the feed cursor, which is an operator action with a name. Emitting `cursor: null` and omitting the key are the SAME statement, because the reader drops null either way — so both are conformant here, and an implementation is not wrong for choosing the tidier one.",
       "adapter": {
         "returns": {
           "documents": [],
@@ -344,7 +344,7 @@
       "resultKeys": ["documents", "stats", "feedName", "feedUrl", "logs"]
     },
     {
-      "name": "a typed watermark survives the return trip verbatim",
+      "name": "a typed cursor survives the return trip verbatim",
       "why": "The cursor an adapter returns is handed straight back as `ctx.cursor` next run. If either leg re-shapes it — stringifying it, dropping `max`, renaming a field — the feed silently resumes from the wrong place.",
       "adapter": {
         "returns": {

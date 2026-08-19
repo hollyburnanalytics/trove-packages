@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { defineSource, defineSync } from '../src/define.js';
-import type { SourceDocument } from '../src/types.js';
+import type { Document } from '../src/types.js';
 
 describe('defineSource — authoring validation', () => {
   it('returns the same source object unchanged (identity)', () => {
     const source = {
       async sync() {
-        return [] as SourceDocument[];
+        return [] as Document[];
       },
     };
     expect(defineSource(source)).toBe(source);

@@ -5,11 +5,11 @@ content into your knowledge base. (Source authoring is an early,
 still-developing surface.) You write a `sync(ctx)` that fetches new content and
 returns documents; this package owns the shapes both ends of that call agree on:
 the invoke contract every runtime speaks, the document shape, the typed `ctx`
-capability object, the watermark/cursor model, the local-run harness the CLI
+capability object, the cursor/cursor model, the local-run harness the CLI
 drives, and manifest validation.
 
 What it does **not** yet own are the helpers a source is mostly written against
-— feed parsing, HTML to text, the scrape loop, the code that writes a watermark.
+— feed parsing, HTML to text, the scrape loop, the code that writes a cursor.
 Those still live alongside the sources themselves, so today the contract is
 shared and the implementation behind it is not. Moving them here is the
 direction of travel.
@@ -64,7 +64,7 @@ export default defineSource({
 });
 ```
 
-### RSS feed (incremental, date watermark)
+### RSS feed (incremental, date cursor)
 
 > `parseRss` / `stripHtml` below are **your own helpers** — the SDK ships no XML
 > parser. Bring your own (e.g. [`fast-xml-parser`](https://www.npmjs.com/package/fast-xml-parser)).
@@ -110,7 +110,7 @@ A bare array is accepted too — `return documents;` is shorthand for
 | Member        | Type                                        | Description                                                                 |
 | ------------- | ------------------------------------------- | --------------------------------------------------------------------------- |
 | `ctx.config`  | `C` (typed preferences)                     | The user's setup preferences. **Never credentials.**                        |
-| `ctx.cursor`  | `Watermark` (read-only)                     | The feed's current watermark; `{ type: 'none' }` on first sync.             |
+| `ctx.cursor`  | `Cursor` (read-only)                     | The feed's current cursor; `{ type: 'none' }` on first sync.             |
 | `ctx.fetch`   | `(url, init?) => Promise<Response>`         | Standard `fetch` — routes through the Mac app's networking.                 |
 | `ctx.log`     | `(...args) => void`                         | Structured log entry, surfaced in the source's logs.                        |
 | `ctx.now`     | `() => Date`                                | Injected clock (deterministic under test).                                  |
@@ -120,9 +120,9 @@ A bare array is accepted too — `return documents;` is shorthand for
 
 ## The document shape → `IngestDocumentInput`
 
-`SourceDocument` maps 1:1 onto the GraphQL `IngestDocumentInput` wire type:
+`Document` maps 1:1 onto the GraphQL `IngestDocumentInput` wire type:
 
-| `SourceDocument`    | `IngestDocumentInput` | Required                       |
+| `Document`    | `IngestDocumentInput` | Required                       |
 | ------------------- | --------------------- | ------------------------------ |
 | `id`                | `externalId`          | **Yes**                        |
 | `title`             | `title`               | No                             |
@@ -138,9 +138,9 @@ A bare array is accepted too — `return documents;` is shorthand for
 Dedup is keyed on `(feed, id)`, so `sync` is safe to retry — re-returning the
 same `id` is skipped.
 
-## Watermarks
+## Cursors
 
-A `Watermark` describes how a feed resumes between syncs:
+A `Cursor` describes how a feed resumes between syncs:
 
 - `{ type: 'date', value }` — time-ordered feeds with "since &lt;date&gt;" filtering (RSS, most APIs).
 - `{ type: 'idSet', values, max? }` — no reliable date filter, so resuming means

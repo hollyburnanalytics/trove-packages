@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
 const CLI_PKG = join(ROOT, 'packages', 'trove-cli', 'package.json');
-const MCP_ENTRY = join(ROOT, 'packages', 'trove-mcp', 'dist', 'index.js');
+const MCP_ENTRY = join(ROOT, 'packages', 'trove-extend', 'dist', 'toolkit', 'index.js');
 const CLI_SRC_VENDOR = join(ROOT, 'packages', 'trove-cli', 'src', 'vendor');
 const CLI_DIST_VENDOR = join(ROOT, 'packages', 'trove-cli', 'dist', 'vendor');
 // Emit to src/vendor (consumed when Bun compiles the single binary) AND

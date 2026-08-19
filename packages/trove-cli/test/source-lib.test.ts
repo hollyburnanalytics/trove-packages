@@ -1,4 +1,4 @@
-import type { Cursor, Document } from '@ontrove/sdk';
+import type { Cursor, Document } from '@ontrove/extend/source';
 import { describe, expect, it } from 'vitest';
 import { parseCursor, serializeCursor, toIngestInput } from '../src/lib/source.js';
 

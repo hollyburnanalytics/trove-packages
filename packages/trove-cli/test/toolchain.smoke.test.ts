@@ -39,7 +39,7 @@ function runCli(
   });
 }
 
-const SOURCE_SRC = `import { defineSource } from '@ontrove/sdk';
+const SOURCE_SRC = `import { defineSource } from '@ontrove/extend/source';
 export default defineSource({
   async sync() {
     return [{ id: 'a', title: 'A', text: 'body', url: 'https://a' }];
@@ -47,8 +47,8 @@ export default defineSource({
 });
 `;
 
-const SERVER_SRC = `import { defineMcpServer, z } from '@ontrove/mcp';
-export default defineMcpServer({
+const SERVER_SRC = `import { defineToolkit, z } from '@ontrove/extend/toolkit';
+export default defineToolkit({
   tools: [
     {
       name: 'ping',
@@ -220,7 +220,7 @@ describe('mcp deploy bundling (real Bun bundler + embedded @ontrove/mcp)', () =>
     expect(tools[0]?.inputSchema).toMatchObject({ type: 'object' });
     // A self-contained hosted-runtime module: substantial, exposes a default
     // export (the fetch handler), and inlines the MCP runtime — no unresolved
-    // `import … from '@ontrove/mcp'` survives.
+    // `import … from '@ontrove/extend/toolkit'` survives.
     expect(bundle.length).toBeGreaterThan(1000);
     expect(bundle).toMatch(/as default/);
     expect(bundle).not.toMatch(/from\s*['"]@ontrove\/mcp['"]/);

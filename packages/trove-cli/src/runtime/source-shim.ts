@@ -1,5 +1,5 @@
-import type { Cursor, Document, TroveSource } from '@ontrove/sdk';
-import { runSource } from '@ontrove/sdk';
+import type { Cursor, Document, TroveSource } from '@ontrove/extend/source';
+import { runSource } from '@ontrove/extend/source';
 import { redirectFollowingFetch } from './redirect-fetch.js';
 
 /**
@@ -26,11 +26,11 @@ import { redirectFollowingFetch } from './redirect-fetch.js';
 
 // Re-exported so this ONE bundled module can also stand in for `@ontrove/sdk`
 // itself. The author's `index.ts` starts with `import { defineSource } from
-// '@ontrove/sdk'`, and in the deployed bundle that specifier resolves here —
+// '@ontrove/extend/source'`, and in the deployed bundle that specifier resolves here —
 // otherwise the sandbox would carry two copies of the SDK, one for the shim and
 // one for the source, and `defineSource` would not be the function `runSource`
 // was written against.
-export * from '@ontrove/sdk';
+export * from '@ontrove/extend/source';
 
 /** The body the runner POSTs to a deployed source. */
 export interface SourceInvokeBody {

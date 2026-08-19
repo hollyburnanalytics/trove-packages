@@ -1,0 +1,86 @@
+{
+  "name": "@ontrove/extend",
+  "version": "1.0.1",
+  "description": "The standard library for extending Trove \u2014 `defineSource` and `defineToolkit`, the capability object each is handed, the guarded fetch they share, and the manifest vocabulary both are held to.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Hollyburn Analytics Inc. <matt@hollyburnanalytics.com>",
+  "homepage": "https://ontrove.sh",
+  "bugs": {
+    "email": "matt@hollyburnanalytics.com",
+    "url": "https://github.com/hollyburnanalytics/trove-packages/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "trove",
+    "source",
+    "sync",
+    "sdk",
+    "knowledge-base",
+    "ingestion",
+    "etl"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./source": {
+      "types": "./dist/source/index.d.ts",
+      "import": "./dist/source/index.js"
+    },
+    "./toolkit": {
+      "types": "./dist/toolkit/index.d.ts",
+      "import": "./dist/toolkit/index.js"
+    },
+    "./http": {
+      "types": "./dist/http.d.ts",
+      "import": "./dist/http.js"
+    },
+    "./contract": {
+      "types": "./dist/contract/index.d.ts",
+      "import": "./dist/contract/index.js"
+    },
+    "./contract/source-invoke.json": "./dist/contract/source-invoke.json"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "prepack": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "test": "vitest run",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.8",
+    "@vitest/coverage-v8": "^4.1.1",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.1",
+    "zod": "^4.4.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hollyburnanalytics/trove-packages.git",
+    "directory": "packages/trove-sdk"
+  },
+  "peerDependencies": {
+    "zod": "^4"
+  }
+}

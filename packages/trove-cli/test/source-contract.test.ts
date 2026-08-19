@@ -13,7 +13,6 @@
  * @module
  */
 
-import type { SourceContext } from '@ontrove/sdk';
 import {
   type AdapterSpec,
   CASE_SECTIONS,
@@ -21,7 +20,8 @@ import {
   contract,
   PRODUCER_SECTIONS,
   READER_SECTIONS,
-} from '@ontrove/sdk/contract';
+} from '@ontrove/extend/contract';
+import type { SourceContext } from '@ontrove/extend/source';
 import { describe, expect, it } from 'vitest';
 import { createSourceWorker } from '../src/runtime/source-shim.js';
 

@@ -15,7 +15,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "bun run --filter './packages/trove-sdk' --filter './packages/trove-mcp' build && bun run --filter './packages/trove-cli' build",
+    "build": "bun run --filter './packages/trove-extend' build && bun run --filter './packages/trove-cli' build",
     "test": "bun run --filter '*' test",
     "test:coverage": "bun run --filter '*' test:coverage",
     "lint": "bun run --filter '*' lint",

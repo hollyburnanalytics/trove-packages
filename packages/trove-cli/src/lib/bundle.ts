@@ -2,8 +2,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import * as ontroveMcp from '@ontrove/mcp';
-import * as ontroveSdk from '@ontrove/sdk';
+import * as ontroveSdk from '@ontrove/extend/source';
+import * as ontroveMcp from '@ontrove/extend/toolkit';
 import { usageError } from '../errors.js';
 
 /**
@@ -58,7 +58,7 @@ let embeddedResolverRegistered = false;
  * Register a Bun runtime resolver that maps bare `@ontrove/sdk`/`@ontrove/mcp`
  * imports to the copies embedded in the binary. This is what lets a user's
  * `index.ts`/`server.ts` — living in a directory with no `node_modules` — run
- * inside the compiled CLI: their `import { defineSource } from '@ontrove/sdk'`
+ * inside the compiled CLI: their `import { defineSource } from '@ontrove/extend/source'`
  * resolves to the exact version the CLI ships, with no install and no drift.
  */
 function registerEmbeddedResolver(): void {
@@ -66,8 +66,8 @@ function registerEmbeddedResolver(): void {
   Bun.plugin({
     name: 'ontrove-embedded',
     setup(build: { module: (specifier: string, cb: () => unknown) => void }): void {
-      build.module('@ontrove/sdk', () => ({ exports: ontroveSdk, loader: 'object' }));
-      build.module('@ontrove/mcp', () => ({ exports: ontroveMcp, loader: 'object' }));
+      build.module('@ontrove/extend/source', () => ({ exports: ontroveSdk, loader: 'object' }));
+      build.module('@ontrove/extend/toolkit', () => ({ exports: ontroveMcp, loader: 'object' }));
     },
   });
   embeddedResolverRegistered = true;
@@ -100,7 +100,7 @@ async function defaultBundleForDeploy(entry: string): Promise<string> {
   writeFileSync(
     wrapper,
     `import server from ${JSON.stringify(resolve(entry))};\n` +
-      `import { toFetchHandler } from '@ontrove/mcp';\n` +
+      `import { toFetchHandler } from '@ontrove/extend/toolkit';\n` +
       `export default toFetchHandler(server);\n`,
   );
   try {
@@ -113,7 +113,7 @@ async function defaultBundleForDeploy(entry: string): Promise<string> {
           name: 'ontrove-mcp-embedded',
           setup(build: BunBuildPluginBuilder): void {
             build.onResolve({ filter: /^@ontrove\/mcp$/ }, () => ({
-              path: '@ontrove/mcp',
+              path: '@ontrove/extend/toolkit',
               namespace: 'ontrove-mcp',
             }));
             build.onLoad({ filter: /.*/, namespace: 'ontrove-mcp' }, () => ({
@@ -347,7 +347,7 @@ export async function bundleServer(
     tools?: ReadonlyArray<Record<string, unknown>>;
   }>(entry, options);
   if (!server || !Array.isArray(server.tools)) {
-    throw usageError(`${entry} default export is not a server (expected defineMcpServer(...)).`);
+    throw usageError(`${entry} default export is not a server (expected defineToolkit(...)).`);
   }
   const tools = server.tools
     .map((t) => toBundledTool(t))

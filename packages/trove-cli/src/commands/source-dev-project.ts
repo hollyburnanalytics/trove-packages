@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
-import type { Cursor, Document, TroveSource } from '@ontrove/sdk';
+import type { Cursor, Document, TroveSource } from '@ontrove/extend/source';
 import type { CommandContext } from '../context.js';
 import { CliError, ExitCode, usageError } from '../errors.js';
 import { flag, type ParsedArgs } from '../lib/args.js';

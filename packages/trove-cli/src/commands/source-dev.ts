@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { basename, isAbsolute, join, resolve } from 'node:path';
-import { type Document, runSource, validateSourceManifest } from '@ontrove/sdk';
+import { type Document, runSource, validateSourceManifest } from '@ontrove/extend/source';
 import type { CommandContext } from '../context.js';
 import { ExitCode, usageError } from '../errors.js';
 import { flag, type ParsedArgs } from '../lib/args.js';
@@ -95,7 +95,7 @@ export async function init(ctx: CommandContext, args: ParsedArgs): Promise<numbe
 }
 
 /** The scaffolded `index.ts` stub for `source init`. */
-const SOURCE_STUB = `import { defineSource } from '@ontrove/sdk';
+const SOURCE_STUB = `import { defineSource } from '@ontrove/extend/source';
 
 /**
  * A Trove source: \`sync(ctx)\` fetches new content and returns documents

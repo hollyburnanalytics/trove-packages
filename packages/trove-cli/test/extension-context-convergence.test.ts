@@ -24,8 +24,8 @@
  * @module
  */
 
-import type { ToolContext } from '@ontrove/mcp';
-import type { ExtensionContext, SourceContext } from '@ontrove/sdk';
+import type { ExtensionContext, SourceContext } from '@ontrove/extend/source';
+import type { ToolContext } from '@ontrove/extend/toolkit';
 import { describe, expect, it } from 'vitest';
 
 /**

@@ -1,4 +1,4 @@
-import type { Cursor, Document } from '@ontrove/sdk';
+import type { Cursor, Document } from '@ontrove/extend/source';
 
 /**
  * Shared helpers for the source dev loop (`source dev/test/sync`): mapping

@@ -1,5 +1,5 @@
-import type { Document } from '@ontrove/sdk';
-import { defineSource } from '@ontrove/sdk';
+import type { Document } from '@ontrove/extend/source';
+import { defineSource } from '@ontrove/extend/source';
 import { afterAll, describe, expect, it } from 'vitest';
 import {
   createSourceWorker,

@@ -213,7 +213,7 @@ describe('validateSourceManifest — runsIn and cloud eligibility', () => {
   it('rejects an unknown runsIn', () => {
     const m = clean();
     m.runsIn = 'edge';
-    expect(errorsOf(m)).toMatch(/manifest.runsIn "edge" is not a known location/);
+    expect(errorsOf(m)).toMatch(/manifest.runsIn "edge" is not a known place to run/);
   });
 
   it('rejects a cloud source whose transport cannot run there', () => {

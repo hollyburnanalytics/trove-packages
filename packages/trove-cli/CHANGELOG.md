@@ -21,16 +21,16 @@
 
   | was                                                                                                                                                                 | is                                                                                                                                          |
   | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `Watermark`, `dateWatermark`, `idSetWatermark`, `readDateWatermark`, `advanceDateWatermark`, `WATERMARK_STRATEGIES`, `WatermarkStrategy`, `MVP_DEPLOYED_WATERMARKS` | `Cursor`, `dateCursor`, `idSetCursor`, `readDateCursor`, `advanceDateCursor`, `CURSOR_STRATEGIES`, `CursorStrategy`, `MVP_DEPLOYED_CURSORS` |
-  | `SourceDocument`                                                                                                                                                    | `Document`                                                                                                                                  |
-  | `SourceLocation`, `LOCATIONS`                                                                                                                                       | `RunsIn`, `RUNS_IN`                                                                                                                         |
+  | `Cursor`, `dateCursor`, `idSetCursor`, `readDateCursor`, `advanceDateCursor`, `CURSOR_STRATEGIES`, `CursorStrategy`, `MVP_DEPLOYED_CURSORS` | `Cursor`, `dateCursor`, `idSetCursor`, `readDateCursor`, `advanceDateCursor`, `CURSOR_STRATEGIES`, `CursorStrategy`, `MVP_DEPLOYED_CURSORS` |
+  | `Document`                                                                                                                                                    | `Document`                                                                                                                                  |
+  | `RunsIn`, `LOCATIONS`                                                                                                                                       | `RunsIn`, `RUNS_IN`                                                                                                                         |
   | `DocumentSemantics`, `DOCUMENT_SEMANTICS`                                                                                                                           | `IngestMode`, `INGEST_MODES`                                                                                                                |
-  | manifest `watermark`                                                                                                                                                | manifest `cursor`                                                                                                                           |
-  | manifest `documentSemantics`                                                                                                                                        | manifest `ingest`                                                                                                                           |
-  | manifest `needs_browser`                                                                                                                                            | manifest `needsBrowser`                                                                                                                     |
+  | manifest `cursor`                                                                                                                                                | manifest `cursor`                                                                                                                           |
+  | manifest `ingest`                                                                                                                                        | manifest `ingest`                                                                                                                           |
+  | manifest `needsBrowser`                                                                                                                                            | manifest `needsBrowser`                                                                                                                     |
   | manifest `location`, value `client`                                                                                                                                 | manifest `runsIn`, value `mac`                                                                                                              |
 
-  `cursor` wins over `watermark` because it is what `ctx.cursor` was already
+  `cursor` wins over `cursor` because it is what `ctx.cursor` was already
   called, what the stored column is called, and what the published invoke
   contract already said in all twenty-five of its references — the wire was
   right and the type was the outlier. `needsBrowser` was the only snake_case key
@@ -61,7 +61,7 @@
 - 5bf1c24: A deployed source's cursor now reaches its adapter unchanged, as the invoke
   contract has always required.
 
-  `toWatermark` reshaped anything it did not recognise into `{ type: 'none' }`.
+  `toCursor` reshaped anything it did not recognise into `{ type: 'none' }`.
   A source that resumes from a monotonic id stores `{ sinceId }`, so every run
   was handed "first run", re-read its API from the top, and advanced nothing —
   with no error anywhere. It is now `toCursor`, which returns what it was given.
@@ -74,7 +74,7 @@
   believed the type and wrote `ctx.cursor.type` compiled cleanly and crashed on
   the first sync of every feed.
 
-  `MVP_DEPLOYED_WATERMARKS` is new, and `validateSourceManifest` uses it: a
+  `MVP_DEPLOYED_CURSORS` is new, and `validateSourceManifest` uses it: a
   `runtime: deployed` source may declare `highWaterId`, because its cursor is
   returned byte-for-byte, while a bundled source may not, because that runtime
   parses the cursor and a shape it does not name parses to nothing. The refusal
@@ -94,7 +94,7 @@
 - 25ed77d: `trove source init` now scaffolds a manifest that `trove source validate`
   accepts. It did not: `kind` held a transport (`feed`), `transport` held a value
   from no vocabulary (`http`), `document_semantics` was both the former field name
-  and a value that never existed (`text`), and `watermark` and `location` were
+  and a value that never existed (`text`), and `cursor` and `location` were
   missing. Nothing objected, because the validator did not yet know the
   vocabulary — so a new author's first two commands succeeded and their first
   deploy did not.

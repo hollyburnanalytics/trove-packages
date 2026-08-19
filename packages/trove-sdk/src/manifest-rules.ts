@@ -190,11 +190,11 @@ export function checkTypeFields(
 }
 
 /**
- * Check `location`, and for `cloud` the eligibility predicate that has to hold
+ * Check `runsIn`, and for `cloud` the eligibility predicate that has to hold
  * for a hosted runtime to be able to run the source at all:
  *
  * ```text
- * location: cloud  ⇒  transport ∈ {feed, api, scrape}
+ * runsIn: cloud  ⇒  transport ∈ {feed, api, scrape}
  *                  ∧  needs_browser ≠ true
  *                  ∧  schedule ≠ "on demand"
  * ```
@@ -205,7 +205,7 @@ export function checkTypeFields(
  * author is not watching.
  *
  * @param manifest - The manifest, as a plain record.
- * @param required - Whether a missing `location` is itself an error.
+ * @param required - Whether a missing `runsIn` is itself an error.
  * @param errors - The accumulator to append to.
  */
 export function checkLocation(
@@ -213,8 +213,8 @@ export function checkLocation(
   required: boolean,
   errors: string[],
 ): void {
-  const location = manifest.runsIn;
-  if (location === undefined) {
+  const runsIn = manifest.runsIn;
+  if (runsIn === undefined) {
     if (required) {
       errors.push(
         `manifest.runsIn is required — where the source runs by default, one of: ${RUNS_IN.join(', ')}`,
@@ -222,13 +222,13 @@ export function checkLocation(
     }
     return;
   }
-  if (!isOneOf(RUNS_IN, location)) {
+  if (!isOneOf(RUNS_IN, runsIn)) {
     errors.push(
-      `manifest.runsIn ${show(location)} is not a known location (expected one of: ${RUNS_IN.join(', ')})`,
+      `manifest.runsIn ${show(runsIn)} is not a known place to run (expected one of: ${RUNS_IN.join(', ')})`,
     );
     return;
   }
-  if (location !== 'cloud') return;
+  if (runsIn !== 'cloud') return;
 
   const transport = manifest.transport;
   if (!isOneOf(CLOUD_ELIGIBLE_TRANSPORTS, transport)) {

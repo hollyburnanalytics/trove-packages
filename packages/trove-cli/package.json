@@ -50,7 +50,7 @@
     "test:smoke": "bun run build:vendor && bun test test/toolchain.smoke.test.ts"
   },
   "dependencies": {
-    "@ontrove/extend": "workspace:*",
+    "@ontrove/extend": "^2.0.0",
     "open": "^10.1.0",
     "zod": "^4"
   },

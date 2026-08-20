@@ -60,3 +60,8 @@ jobs:
       # exists fails the release job, which runs AFTER the PR has landed.
       - name: Changeset config resolves to real packages
         run: bun run changesets:check
+
+      # `workspace:*` resolves here and nowhere else, so only a manifest rule can
+      # catch it — every runtime check in this job passes with it in place.
+      - name: Published packages carry real semver ranges
+        run: bun run deps:check

@@ -389,14 +389,17 @@ export interface ManifestConfigField {
   type?: string;
   /** Optional example text shown in the input. */
   placeholder?: string;
-  /**
-   * A regex the value must match, as a string.
-   *
-   * Declared by two shipped toolkits and absent from this type, so it was a
-   * field the compiler could not see. Whether a client enforces it is a
-   * separate question from whether an author may state it.
-   */
+  /** A regex the value must match, as a string. */
   pattern?: string;
+  /** A short note under the input — what a good value looks like. */
+  hint?: string;
+  /** The value the field starts with when the user has chosen nothing. */
+  default?: readonly string[];
+  /**
+   * A searchable picker for this field, instead of free text — which provider
+   * backs it, and how it authenticates.
+   */
+  directory?: Record<string, unknown>;
 }
 
 /**

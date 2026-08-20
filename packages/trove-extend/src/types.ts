@@ -389,6 +389,14 @@ export interface ManifestConfigField {
   type?: string;
   /** Optional example text shown in the input. */
   placeholder?: string;
+  /**
+   * A regex the value must match, as a string.
+   *
+   * Declared by two shipped toolkits and absent from this type, so it was a
+   * field the compiler could not see. Whether a client enforces it is a
+   * separate question from whether an author may state it.
+   */
+  pattern?: string;
 }
 
 /**

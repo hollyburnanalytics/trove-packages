@@ -55,3 +55,8 @@ jobs:
 
       - name: README examples typecheck against the built API
         run: bun run docs:examples
+
+      # Before merge, not at release: a config naming a package that no longer
+      # exists fails the release job, which runs AFTER the PR has landed.
+      - name: Changeset config resolves to real packages
+        run: bun run changesets:check

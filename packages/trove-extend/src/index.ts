@@ -43,6 +43,7 @@ export {
   TROVE_USER_AGENT,
 } from './http.js';
 export type {
+  ExtensionCache,
   ExtensionContext,
   FetchLike,
   LogChannel,

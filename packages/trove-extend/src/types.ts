@@ -258,6 +258,20 @@ export interface LogChannel {
  * Everything here is a capability. There is no ambient authority: an extension
  * reaches the outside world only through what it was handed.
  */
+/**
+ * A run-to-run cache, where the host offers one.
+ *
+ * Exists so a source can avoid re-fetching an unchanged sub-resource — show
+ * notes, a transcript page — across scheduled runs. Values are strings; a
+ * source that wants structure serialises it.
+ */
+export interface ExtensionCache {
+  /** The cached value, or `null` on a miss. */
+  get(key: string): Promise<string | null>;
+  /** Store a value for at most `ttlSeconds`. The host may shorten it. */
+  put(key: string, value: string, ttlSeconds: number): Promise<void>;
+}
+
 export interface ExtensionContext {
   /**
    * A credential the manifest declared, by name.
@@ -296,6 +310,15 @@ export interface ExtensionContext {
    * test, and so a replayed fixture means the same thing tomorrow.
    */
   now(): Date;
+  /**
+   * A best-effort key/value cache that outlives a single run.
+   *
+   * **Optional, and absent is normal** — a host may provide no cache at all, so
+   * read it as `ctx.cache?.get(...)` and treat a miss and an absent cache the
+   * same way. Never the source of truth: anything here must be re-derivable
+   * from the upstream, because it can vanish between runs.
+   */
+  cache?: ExtensionCache;
 }
 
 /**
@@ -348,6 +371,19 @@ export interface SourceContext<C = Record<string, unknown>> extends ExtensionCon
    * anyway; a source should not have to know which host it is on.
    */
   progress(done: number, message?: string): void;
+  /**
+   * A Playwright browser context, for a source whose manifest sets
+   * `needsBrowser: true`.
+   *
+   * `unknown` on purpose: typing it would put Playwright in this package's
+   * dependency graph for the benefit of the one source that uses it. A source
+   * that needs it narrows at its own boundary.
+   *
+   * Only the Mac runtime supplies one. A `needsBrowser` source therefore
+   * declares `runsIn: 'mac'`, and finding this `undefined` in the cloud is a
+   * misconfiguration rather than a condition to work around.
+   */
+  readonly browser?: unknown;
 }
 
 /**
@@ -407,6 +443,25 @@ export interface ManifestConfigField {
  * and which preference fields the user fills in during setup
  * (sources/manifest reference).
  */
+/**
+ * How much of an upstream's history a source can actually reach.
+ *
+ * A property of the upstream, not of the source: an RSS feed carrying the last
+ * 20 posts cannot be made to yield the 21st by syncing harder. Recorded so the
+ * product can say why a backfill stopped where it did, rather than presenting a
+ * bounded archive as a complete one.
+ */
+export interface HistoryReach {
+  /**
+   * `full` — the whole archive is reachable.
+   * `window` — a bounded window, commonly the most recent N items.
+   * `recent-only` — roughly what is on the front page now.
+   */
+  kind: 'full' | 'window' | 'recent-only';
+  /** Why the bound exists, in a sentence a user could read. */
+  note: string;
+}
+
 export interface SourceManifest {
   /** Stable source-type id; pattern `^[a-z0-9-]+$`. */
   id: string;
@@ -442,7 +497,7 @@ export interface SourceManifest {
    */
   egress: readonly string[];
   /** How far back the source can reach, when that is bounded by the upstream. */
-  historyReach?: string;
+  historyReach?: HistoryReach;
   /** `deployed` when the source runs on its own in the hosted runtime. */
   runtime?: string;
   /** Why the egress list looks the way it does, when that needs saying. */
@@ -451,8 +506,15 @@ export interface SourceManifest {
   egressNotFetched?: readonly string[];
   /** The preference fields shown in the setup wizard. Preferences only — no credentials. */
   config?: Record<string, ManifestConfigField>;
-  /** The per-account/per-feed expansion this source supports. */
-  fanOut?: Record<string, unknown>;
+  /**
+   * The `config` field this source fans out over — one run covers every value
+   * in it. Names a key of {@link SourceManifest.config}, so `fanOut: 'feeds'`
+   * means the user's `feeds` list is the unit of expansion.
+   *
+   * Declared as `Record<string, unknown>` until 3.3.0, which described nothing
+   * any catalog wrote: all seven uses are a bare key name.
+   */
+  fanOut?: string;
   /** Whether the source is offered in the marketplace. */
   available?: boolean;
   /** Whether the platform reformats this source's text, or leaves it verbatim. */
@@ -461,4 +523,9 @@ export interface SourceManifest {
   secrets?: readonly string[];
   /** A declared authorization strategy, for sources that hold one. */
   auth?: Record<string, unknown>;
+  /**
+   * Marks the file as an artifact of {@link toSourceManifest}, not a hand-written
+   * document. Every generated manifest carries it; nothing reads it but a person.
+   */
+  generated?: boolean;
 }

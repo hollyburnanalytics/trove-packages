@@ -35,6 +35,7 @@ import {
   checkConfigBlock,
   checkFanOut,
   checkFormatting,
+  checkHistoryReach,
   checkLocation,
   checkSchedule,
   checkTypeFields,
@@ -226,6 +227,7 @@ export function validateSourceManifest(
   checkSchedule(manifest, errors);
   checkEgress(manifest, required, errors);
   checkFanOut(manifest, errors);
+  checkHistoryReach(manifest, errors);
   checkFormatting(manifest, errors);
 
   return { valid: errors.length === 0, errors };
@@ -243,6 +245,8 @@ export {
   type FanOutFieldType,
   FORMATTING,
   type FormattingPolicy,
+  HISTORY_REACH_KINDS,
+  type HistoryReachKind,
   INGEST_MODES,
   type IngestMode,
   MVP,

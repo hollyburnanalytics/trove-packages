@@ -93,6 +93,20 @@ export const FAN_OUT_FIELD_TYPES = ['url[]', 'text[]'] as const;
 export type FanOutFieldType = (typeof FAN_OUT_FIELD_TYPES)[number];
 
 /**
+ * How much of an upstream's history is reachable at all.
+ *
+ * A property of the upstream, not of the adapter: `window` is an RSS feed
+ * carrying its publisher's most recent N posts, `recent-only` is a headline
+ * feed holding roughly a day, and `full` is an archive that can be walked to
+ * the beginning. Recorded so a stalled backfill can be explained rather than
+ * retried against a wall.
+ */
+export const HISTORY_REACH_KINDS = ['full', 'window', 'recent-only'] as const;
+
+/** One of {@link HISTORY_REACH_KINDS}. */
+export type HistoryReachKind = (typeof HISTORY_REACH_KINDS)[number];
+
+/**
  * The affordances a directoried config field can ask a client to render:
  * `search` (type a name, pick from results) or `resolve` (paste something and
  * have it turned into the real address).

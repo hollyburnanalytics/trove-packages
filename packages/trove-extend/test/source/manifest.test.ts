@@ -5,6 +5,7 @@ import {
   DIRECTORY_MODES,
   FAN_OUT_FIELD_TYPES,
   FORMATTING,
+  HISTORY_REACH_KINDS,
   INGEST_MODES,
   isCredentialConfigKey,
   MVP,
@@ -304,6 +305,37 @@ describe('validateSourceManifest — fanOut', () => {
     m.config = { feedUrl: { label: 'Feed URL', type: 'url' } };
     m.fanOut = 'feedUrl';
     expect(errorsOf(m)).toMatch(/manifest.config.feedUrl.type is "url"/);
+  });
+});
+
+describe('validateSourceManifest — historyReach', () => {
+  it('accepts every kind, and treats absence as valid', () => {
+    for (const kind of HISTORY_REACH_KINDS) {
+      const m = clean();
+      m.historyReach = { kind, note: 'The feed carries only what the publisher included.' };
+      expect(validateSourceManifest(m).valid).toBe(true);
+    }
+    expect(validateSourceManifest(clean()).valid).toBe(true);
+  });
+
+  it('rejects the bare string the type used to permit', () => {
+    // Until 3.3.0 `historyReach` was typed `string` and validated by nothing,
+    // while all 24 declarations in the catalogs were objects.
+    const m = clean();
+    m.historyReach = 'only the last 20 posts';
+    expect(errorsOf(m)).toMatch(/manifest.historyReach .* must be an object with \{ kind, note \}/);
+  });
+
+  it('rejects an unknown kind', () => {
+    const m = clean();
+    m.historyReach = { kind: 'partial', note: 'Some of it.' };
+    expect(errorsOf(m)).toMatch(/manifest.historyReach.kind "partial" must be one of/);
+  });
+
+  it('rejects a missing or empty note', () => {
+    const m = clean();
+    m.historyReach = { kind: 'window' };
+    expect(errorsOf(m)).toMatch(/manifest.historyReach.note must be a non-empty string/);
   });
 });
 

@@ -85,6 +85,8 @@ export interface WireDocument {
   date?: string;
   /** Tags to attach to the document. */
   tags?: string[];
+  /** A second rendering to fall back to when the primary is unusable. */
+  fallback?: { file_url: string; mime_type: string };
   /** Arbitrary source-specific JSON. */
   metadata?: Record<string, unknown>;
 }
@@ -206,6 +208,14 @@ export function toWireDocument(doc: Document): WireDocument {
     // the deployed one, so the same source quietly indexed bookmarks as plain
     // text once it was deployed.
     ...(doc.contentType !== undefined && { content_type: doc.contentType }),
+    // The same hazard, found by the same reasoning: Trove's ingest door accepts
+    // `fallback`, the local path carries it, and this mapper did not — so a
+    // deployed source's second rendering would vanish without a word. arXiv is
+    // the source that has one (HTML with readable maths, PDF behind it), and it
+    // is bundled today, which is the only reason this never bit.
+    ...(doc.fallback !== undefined && {
+      fallback: { file_url: doc.fallback.fileUrl, mime_type: doc.fallback.mimeType },
+    }),
   };
 }
 

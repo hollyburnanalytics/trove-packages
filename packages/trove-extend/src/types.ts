@@ -131,6 +131,16 @@ export interface Document {
    * becomes `transcript` automatically).
    */
   contentType?: SourceContentType;
+  /**
+   * A second rendering to fall back to when the primary one is unusable.
+   *
+   * arXiv is the case it exists for: a paper's HTML carries readable `$…$`
+   * maths, the same equation out of the PDF is glyph soup, and a two-column
+   * PDF welds paragraphs together — but the HTML only exists for recent
+   * papers. So the source offers the HTML and names the PDF as the fallback,
+   * and the platform uses it when the primary fetch fails or yields nothing.
+   */
+  fallback?: { fileUrl: string; mimeType: string };
 }
 
 /**
@@ -207,13 +217,49 @@ export interface SourceSyncResult {
    */
   feedUrl?: string;
   /**
-   * How much work this run did and how much is left.
+   * What this run did, as counters.
    *
-   * `remaining > 0` is what tells the runner to drain again rather than wait
-   * for the next scheduled tick, so a backfill finishes in one sitting instead
-   * of one page per interval.
+   * **`remaining` is the only key anything reads** — the runner drains on it.
+   * The rest are a source's own bookkeeping, useful when a run is being
+   * debugged and inert otherwise; `blocked`, `waiting`, `unparseable`, `saved`
+   * and `duration_ms` are all in use. The named fields below are the ones
+   * enough sources share to be worth documenting, not a closed set — which is
+   * why the index signature is here rather than a fifth, sixth and seventh
+   * field being added one failing typecheck at a time.
+   *
+   * Counters, though: prose belongs in `ctx.log`, which is persisted as the run
+   * transcript and shown to the user. A source that put a `string[]` of
+   * warnings here was duplicating lines it had already logged, into a field
+   * nothing reads.
    */
-  stats?: { fetched?: number; remaining?: number };
+  stats?: {
+    /** How many documents this run produced. */
+    fetched?: number;
+    /**
+     * How many the source knows are still waiting, when it can tell.
+     *
+     * The number the runner drains on: `> 0` means go again now rather than
+     * wait for the next scheduled tick, so a backfill finishes in one sitting.
+     * This is the ONE key with behaviour attached — spell it right.
+     */
+    remaining?: number;
+    /**
+     * How many candidates this run passed over — already seen, out of window,
+     * or filtered out by config. Reported so a run that returns nothing can be
+     * told apart from a run that found nothing.
+     */
+    skipped?: number;
+    /**
+     * How many of the returned documents carry no usable date.
+     *
+     * A date-cursor source cannot resume past an undated document, so a feed
+     * quietly producing them is a feed that will re-read the same window
+     * forever.
+     */
+    undated?: number;
+    /** Any other counter this source finds worth reporting. */
+    [counter: string]: number | undefined;
+  };
 }
 
 /**
@@ -258,22 +304,48 @@ export interface LogChannel {
  * Everything here is a capability. There is no ambient authority: an extension
  * reaches the outside world only through what it was handed.
  */
+/**
+ * A run-to-run cache, where the host offers one.
+ *
+ * Exists so a source can avoid re-fetching an unchanged sub-resource — show
+ * notes, a transcript page — across scheduled runs. Values are strings; a
+ * source that wants structure serialises it.
+ */
+export interface ExtensionCache {
+  /** The cached value, or `null` on a miss. */
+  get(key: string): Promise<string | null>;
+  /** Store a value for at most `ttlSeconds`. The host may shorten it. */
+  put(key: string, value: string, ttlSeconds: number): Promise<void>;
+}
+
 export interface ExtensionContext {
   /**
-   * A credential the manifest declared, by name.
+   * A credential the manifest declared, by name — **`undefined` when it is not
+   * set**.
    *
    * Resolves whether the value was pasted by the user or is a token Trove
    * refreshed a moment ago — the extension cannot tell, and must not need to.
    * That is what keeps delegated authorization out of every author's code.
+   * Async for the same reason: resolving may be a vault read or a refresh.
    *
-   * Async because resolving may involve a vault read or a token refresh.
-   * Rejects when the name was never declared in the manifest, which is a
-   * programming error rather than a runtime condition.
+   * This is the reader for a credential the extension can work without — an
+   * optional API key that raises a rate limit, an OAuth client secret a public
+   * client does not have. When the extension cannot proceed without the value,
+   * use {@link requireSecret} and let it raise.
+   *
+   * Until 3.3.0 this rejected, and `requireSecret` was documented as behaving
+   * "identically; the name is the documentation" — so there were two names for
+   * one behaviour and no way at all to read an optional credential. The two
+   * sources that had one reached around the whole mechanism into the legacy
+   * `ctx.credentials` bag instead.
    */
-  secret(name: string): Promise<string>;
+  secret(name: string): Promise<string | undefined>;
   /**
-   * {@link secret}, but stating plainly that the extension cannot proceed
-   * without it. Behaves identically; the name is the documentation.
+   * {@link secret}, for a credential the extension genuinely cannot proceed
+   * without: rejects, naming the credential, rather than resolving `undefined`.
+   *
+   * Prefer it to `if (!(await ctx.secret(n))) throw` — the failure message is
+   * the useful half, and the host writes a better one than each extension will.
    */
   requireSecret(name: string): Promise<string>;
   /**
@@ -296,6 +368,15 @@ export interface ExtensionContext {
    * test, and so a replayed fixture means the same thing tomorrow.
    */
   now(): Date;
+  /**
+   * A best-effort key/value cache that outlives a single run.
+   *
+   * **Optional, and absent is normal** — a host may provide no cache at all, so
+   * read it as `ctx.cache?.get(...)` and treat a miss and an absent cache the
+   * same way. Never the source of truth: anything here must be re-derivable
+   * from the upstream, because it can vanish between runs.
+   */
+  cache?: ExtensionCache;
 }
 
 /**
@@ -348,6 +429,19 @@ export interface SourceContext<C = Record<string, unknown>> extends ExtensionCon
    * anyway; a source should not have to know which host it is on.
    */
   progress(done: number, message?: string): void;
+  /**
+   * A Playwright browser context, for a source whose manifest sets
+   * `needsBrowser: true`.
+   *
+   * `unknown` on purpose: typing it would put Playwright in this package's
+   * dependency graph for the benefit of the one source that uses it. A source
+   * that needs it narrows at its own boundary.
+   *
+   * Only the Mac runtime supplies one. A `needsBrowser` source therefore
+   * declares `runsIn: 'mac'`, and finding this `undefined` in the cloud is a
+   * misconfiguration rather than a condition to work around.
+   */
+  readonly browser?: unknown;
 }
 
 /**
@@ -407,6 +501,25 @@ export interface ManifestConfigField {
  * and which preference fields the user fills in during setup
  * (sources/manifest reference).
  */
+/**
+ * How much of an upstream's history a source can actually reach.
+ *
+ * A property of the upstream, not of the source: an RSS feed carrying the last
+ * 20 posts cannot be made to yield the 21st by syncing harder. Recorded so the
+ * product can say why a backfill stopped where it did, rather than presenting a
+ * bounded archive as a complete one.
+ */
+export interface HistoryReach {
+  /**
+   * `full` — the whole archive is reachable.
+   * `window` — a bounded window, commonly the most recent N items.
+   * `recent-only` — roughly what is on the front page now.
+   */
+  kind: 'full' | 'window' | 'recent-only';
+  /** Why the bound exists, in a sentence a user could read. */
+  note: string;
+}
+
 export interface SourceManifest {
   /** Stable source-type id; pattern `^[a-z0-9-]+$`. */
   id: string;
@@ -442,7 +555,7 @@ export interface SourceManifest {
    */
   egress: readonly string[];
   /** How far back the source can reach, when that is bounded by the upstream. */
-  historyReach?: string;
+  historyReach?: HistoryReach;
   /** `deployed` when the source runs on its own in the hosted runtime. */
   runtime?: string;
   /** Why the egress list looks the way it does, when that needs saying. */
@@ -451,8 +564,15 @@ export interface SourceManifest {
   egressNotFetched?: readonly string[];
   /** The preference fields shown in the setup wizard. Preferences only — no credentials. */
   config?: Record<string, ManifestConfigField>;
-  /** The per-account/per-feed expansion this source supports. */
-  fanOut?: Record<string, unknown>;
+  /**
+   * The `config` field this source fans out over — one run covers every value
+   * in it. Names a key of {@link SourceManifest.config}, so `fanOut: 'feeds'`
+   * means the user's `feeds` list is the unit of expansion.
+   *
+   * Declared as `Record<string, unknown>` until 3.3.0, which described nothing
+   * any catalog wrote: all seven uses are a bare key name.
+   */
+  fanOut?: string;
   /** Whether the source is offered in the marketplace. */
   available?: boolean;
   /** Whether the platform reformats this source's text, or leaves it verbatim. */
@@ -461,4 +581,9 @@ export interface SourceManifest {
   secrets?: readonly string[];
   /** A declared authorization strategy, for sources that hold one. */
   auth?: Record<string, unknown>;
+  /**
+   * Marks the file as an artifact of {@link toSourceManifest}, not a hand-written
+   * document. Every generated manifest carries it; nothing reads it but a person.
+   */
+  generated?: boolean;
 }

@@ -254,15 +254,16 @@ export async function runSource<C = Record<string, unknown>>(
     // a source that asks for a credential it needs cannot continue, and
     // "SEATS_AERO_API_KEY is not available here" is the only message that says
     // what to do about it.
-    secret: (name: string): Promise<string> =>
-      options.secrets && name in options.secrets
-        ? Promise.resolve(options.secrets[name] as string)
-        : Promise.reject(
-            new Error(
-              `Secret "${name}" is not available in this run. Pass it via \`secrets\` to runSource, or set it on the source in Trove.`,
-            ),
-          ),
-    requireSecret: (name: string): Promise<string> => ctx.secret(name),
+    secret: (name: string): Promise<string | undefined> => Promise.resolve(options.secrets?.[name]),
+    requireSecret: async (name: string): Promise<string> => {
+      const value = await ctx.secret(name);
+      if (value === undefined || value === '') {
+        throw new Error(
+          `Secret "${name}" is not available in this run. Pass it via \`secrets\` to runSource, or set it on the source in Trove.`,
+        );
+      }
+      return value;
+    },
     // No deadline locally: a developer watching their own sync is the budget.
     deadline: options.deadline ?? Number.POSITIVE_INFINITY,
     progress: options.onProgress ?? ((): void => {}),

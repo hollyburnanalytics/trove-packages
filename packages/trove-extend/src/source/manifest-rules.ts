@@ -20,6 +20,7 @@ import {
   DIRECTORY_MODES,
   FAN_OUT_FIELD_TYPES,
   FORMATTING,
+  HISTORY_REACH_KINDS,
   INGEST_MODES,
   MVP,
   MVP_DEPLOYED_CURSORS,
@@ -276,6 +277,35 @@ export function checkSchedule(manifest: Record<string, unknown>, errors: string[
  * @param manifest - The manifest, as a plain record.
  * @param errors - The accumulator to append to.
  */
+/**
+ * `historyReach`, when declared, must be `{ kind, note }` with a known kind.
+ *
+ * Typed as a bare `string` until 3.3.0 and checked by nothing, while all 24
+ * declarations in the catalogs were objects — so the field said one thing to
+ * the compiler, another to every author, and nothing to the validator.
+ *
+ * @param manifest - The manifest to check.
+ * @param errors - Collector; appended to in place.
+ */
+export function checkHistoryReach(manifest: Record<string, unknown>, errors: string[]): void {
+  const reach = manifest.historyReach;
+  if (reach === undefined) return;
+  if (!isRecord(reach)) {
+    errors.push(`manifest.historyReach ${show(reach)} must be an object with { kind, note }`);
+    return;
+  }
+  if (!isOneOf(HISTORY_REACH_KINDS, reach.kind)) {
+    errors.push(
+      `manifest.historyReach.kind ${show(reach.kind)} must be one of: ${HISTORY_REACH_KINDS.join(', ')}`,
+    );
+  }
+  if (typeof reach.note !== 'string' || reach.note.length === 0) {
+    errors.push(
+      'manifest.historyReach.note must be a non-empty string saying why the bound exists',
+    );
+  }
+}
+
 export function checkFanOut(manifest: Record<string, unknown>, errors: string[]): void {
   const fanOut = manifest.fanOut;
   if (fanOut === undefined) return;

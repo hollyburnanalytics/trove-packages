@@ -113,7 +113,8 @@ async function readCallback(res: Response, label: string): Promise<unknown> {
  * @returns An async `secret(name)` function.
  */
 function makeSecret(p: CtxParams): ToolContext['secret'] {
-  return async (name: string): Promise<string> => {
+  return async (name: string): Promise<string | undefined> => {
+    // A programming error, not a missing credential: still throws.
     if (typeof name !== 'string' || name.length === 0) {
       throw new Error('ctx.secret(name): name must be a non-empty string');
     }
@@ -123,9 +124,11 @@ function makeSecret(p: CtxParams): ToolContext['secret'] {
       body: JSON.stringify({ ctxToken: p.ctxToken, name }),
     });
     const body = (await readCallback(res, 'ctx.secret')) as { value?: unknown };
-    if (typeof body.value !== 'string') {
-      throw new Error(`ctx.secret("${name}"): no value returned`);
-    }
+    // `200 { value: null }` is the platform saying "declared, not set" — an
+    // ordinary state, so it resolves `undefined`. A name the manifest never
+    // declared still fails the callback outright and throws from
+    // `readCallback`, because that one is the author's mistake.
+    if (typeof body.value !== 'string') return undefined;
     // Remember the resolved value so log output can be redacted against it.
     if (body.value.length > 0) p.knownSecrets.add(body.value);
     return body.value;

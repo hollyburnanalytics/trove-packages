@@ -45,22 +45,20 @@ function withDefaultUserAgent(init?: RequestInit): RequestInit {
  * Wrap a raw `secret` resolver into `requireSecret`, which raises a clear,
  * non-retryable {@link ToolError} when the secret is missing or empty.
  *
+ * **A failure of the callback itself is NOT caught.** It propagates, and the
+ * handler surfaces it generically. Until 3.3.0 this swallowed everything and
+ * reported "not set" — which was defensible while `secret` could only throw,
+ * since the two were indistinguishable. Now that unset resolves `undefined`,
+ * the only way `secret` still raises is a name the manifest never declared or a
+ * callback that failed, and telling the model "run `trove secret set`" about
+ * either of those sends someone to fix a text box over an author's bug.
+ *
  * @param secret - The raw `ctx.secret` resolver.
  * @returns A `requireSecret(name)` function.
  */
 export function makeRequireSecret(secret: ToolContext['secret']): ToolContext['requireSecret'] {
   return async (name: string): Promise<string> => {
-    let value: string;
-    try {
-      value = await secret(name);
-    } catch {
-      throw new ToolError(
-        `${name} is not set. Run \`trove secret set <server> ${name} --from-stdin\`.`,
-        {
-          retryable: false,
-        },
-      );
-    }
+    const value = await secret(name);
     if (!value) {
       throw new ToolError(
         `${name} is not set. Run \`trove secret set <server> ${name} --from-stdin\`.`,

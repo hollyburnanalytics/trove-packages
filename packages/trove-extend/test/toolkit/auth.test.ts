@@ -41,8 +41,10 @@ function routed(opts: {
     const headers = new Headers(init?.headers);
     if (url.endsWith('/internal/secret')) {
       const body = JSON.parse(String(init?.body)) as { name: string };
-      const value = opts.secrets[body.name];
-      return value === undefined ? new Response('no', { status: 404 }) : jsonResponse({ value });
+      // Declared-but-unset is `200 { value: null }`, which is what the platform
+      // returns. A 404 would be a callback FAILURE — a different thing, and one
+      // `requireSecret` deliberately no longer relabels as "not set".
+      return jsonResponse({ value: opts.secrets[body.name] ?? null });
     }
     if (url === TOKEN_URL) {
       seen.token++;
@@ -208,7 +210,7 @@ describe('declarative oauth2 auth', () => {
   });
 
   it('surfaces a clear non-retryable error when a credential secret is unset', async () => {
-    const { fetchImpl } = routed({ secrets: { CLIENT_SECRET: 'sec' } }); // CLIENT_ID missing → 404
+    const { fetchImpl } = routed({ secrets: { CLIENT_SECRET: 'sec' } }); // CLIENT_ID unset
     const s = server(fetchImpl, (ctx) => ctx.fetchJson(API_URL));
     const r = await s.handle(baseCall('t'));
     expect(r).toMatchObject({ ok: false, retryable: false });

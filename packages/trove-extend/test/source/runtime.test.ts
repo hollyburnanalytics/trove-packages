@@ -234,7 +234,7 @@ describe('the context spine that both SDKs share', () => {
   });
 
   it('hands over a declared secret by name', async () => {
-    let seen = '';
+    let seen: string | undefined = '';
     await runSource(
       {
         async sync(ctx) {

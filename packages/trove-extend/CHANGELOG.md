@@ -1,5 +1,51 @@
 # @ontrove/sdk
 
+## 3.3.0
+
+### Minor Changes
+
+- 220ba39: The manifest and context types describe what the catalogs and runtimes actually
+  use — measured as a union across all 124 manifests and all three runtimes, in
+  one pass rather than a field per release.
+
+  - `SourceManifest.historyReach` was `string`; every one of the 24 declarations
+    is `{ kind, note }`. Now `HistoryReach`, with `HISTORY_REACH_KINDS`
+    (`full` | `window` | `recent-only`) and a `checkHistoryReach` rule, so the
+    shape is enforced at import time rather than merely described.
+  - `SourceManifest.fanOut` was `Record<string, unknown>`; all seven uses are a
+    bare key name, and `checkFanOut` has always required a string. The type was
+    the only thing that disagreed.
+  - `SourceManifest.generated` is declared. Every generated manifest carries it.
+  - `ExtensionContext.cache` is declared: Trove's cloud runtime supplies it and
+    two sources read it, but no type said so. Optional, because a host may
+    provide none.
+  - `SourceContext.browser` is declared, for `needsBrowser` sources. Only the Mac
+    runtime supplies one.
+
+  `historyReach` is the sole breaking shape, and no published manifest used the
+  old one, so nothing on npm needs changing.
+
+- 4c7303a: `ctx.secret(name)` resolves `undefined` for a credential that is declared but
+  not set; `ctx.requireSecret(name)` is the half that raises.
+
+  They were documented as behaving "identically; the name is the documentation" —
+  two names for one behaviour, and no way at all to read an optional credential.
+  **Four toolkits had independently written the same workaround**
+  (`try { await ctx.secret(n) } catch { return undefined }`): x, pocket-casts,
+  bunkers and usda-agtransport. Two sources skipped the mechanism entirely and
+  reached into the legacy `ctx.credentials` bag instead. Optional credentials are
+  ordinary — an API key that raises a rate limit, an OAuth client secret a public
+  client does not have.
+
+  `/internal/secret` answers `200 { value: null }` for declared-but-unset, so the
+  SDK can tell it apart from a name the manifest never declared, which still
+  fails. A host implementing the callback must return `null` rather than an error
+  status for an unset credential.
+
+  Also: `toWireDocument` carries `fallback`. It is accepted by Trove's ingest and
+  carried on the local path, and this mapper dropped it — the same silent-drop
+  that lost `contentType` on the deployed path once already.
+
 ## 3.2.0
 
 ### Minor Changes

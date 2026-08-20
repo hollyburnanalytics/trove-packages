@@ -36,7 +36,7 @@ describe('ctx.secret', () => {
             description: 'd',
             input: z.object({}),
             handler: async (_args, ctx) => {
-              captured = await ctx.secret('ORDERS_API_TOKEN');
+              captured = await ctx.requireSecret('ORDERS_API_TOKEN');
               return captured;
             },
           },
@@ -69,7 +69,7 @@ describe('ctx.secret', () => {
             name: 't',
             description: 'd',
             input: z.object({}),
-            handler: async (_a, ctx) => await ctx.secret('S'),
+            handler: async (_a, ctx) => await ctx.requireSecret('S'),
           },
         ],
       },
@@ -90,7 +90,7 @@ describe('ctx.secret', () => {
             name: 't',
             description: 'd',
             input: z.object({}),
-            handler: async (_a, ctx) => await ctx.secret('S'),
+            handler: async (_a, ctx) => await ctx.requireSecret('S'),
           },
         ],
       },
@@ -110,7 +110,7 @@ describe('ctx.secret', () => {
             name: 't',
             description: 'd',
             input: z.object({}),
-            handler: async (_a, ctx) => await ctx.secret('S'),
+            handler: async (_a, ctx) => await ctx.requireSecret('S'),
           },
         ],
       },
@@ -130,7 +130,7 @@ describe('ctx.secret', () => {
             name: 't',
             description: 'd',
             input: z.object({}),
-            handler: async (_a, ctx) => await ctx.secret(''),
+            handler: async (_a, ctx) => await ctx.requireSecret(''),
           },
         ],
       },

@@ -219,7 +219,10 @@ describe('createSourceWorker', () => {
     // telling its author to run it on a Mac.
     const source: TroveSource = {
       async sync(ctx) {
-        const key = await ctx.secret('API_KEY');
+        // `requireSecret`: this source cannot title its document without one,
+        // and a `Document.title` is required — which is the type saying the
+        // same thing.
+        const key = await ctx.requireSecret('API_KEY');
         return [{ id: 'a', title: key, text: 'body' }];
       },
     };

@@ -68,17 +68,17 @@ describe('dispatcher', () => {
     expect(code).toBe(ExitCode.Auth);
   });
 
-  it('matches a two-token command path (mcp ls) over a one-token one', async () => {
+  it('matches a two-token command path (toolkit ls) over a one-token one', async () => {
     const mock = mockFetch({ data: { mcpServers: [] } });
-    const code = await run({ argv: ['mcp', 'ls'], ...baseEnv(mock) });
+    const code = await run({ argv: ['toolkit', 'ls'], ...baseEnv(mock) });
     expect(code).toBe(ExitCode.Success);
-    expect(mock.calls[0]?.operationName).toBe('CliMcpServers');
+    expect(mock.calls[0]?.operationName).toBe('CliToolkits');
   });
 
   it('accepts a global value flag with = syntax (--endpoint=…)', async () => {
     const mock = mockFetch({ data: { mcpServers: [] } });
     const code = await run({
-      argv: ['--endpoint=http://localhost:9', 'mcp', 'ls'],
+      argv: ['--endpoint=http://localhost:9', 'toolkit', 'ls'],
       ...baseEnv(mock),
     });
     expect(code).toBe(ExitCode.Success);
@@ -95,13 +95,13 @@ describe('dispatcher', () => {
   it('passes tokens after -- through verbatim', async () => {
     const mock = mockFetch({ data: { mcpServers: [] } });
     // `--` enters passthrough; subsequent --json is NOT treated as a global flag.
-    const code = await run({ argv: ['mcp', 'ls', '--'], ...baseEnv(mock) });
+    const code = await run({ argv: ['toolkit', 'ls', '--'], ...baseEnv(mock) });
     expect(code).toBe(ExitCode.Success);
   });
 
   it('honors a global --profile selector', async () => {
     const mock = mockFetch({ data: { mcpServers: [] } });
-    const code = await run({ argv: ['--profile', 'prod', 'mcp', 'ls'], ...baseEnv(mock) });
+    const code = await run({ argv: ['--profile', 'prod', 'toolkit', 'ls'], ...baseEnv(mock) });
     expect(code).toBe(ExitCode.Success);
   });
 
@@ -138,13 +138,12 @@ describe('dispatcher', () => {
       'stats',
       'save',
       'ingest',
-      'mcp ls',
-      'mcp deploy',
-      'mcp pause',
-      'mcp resume',
-      'mcp rollback',
-      'mcp rm',
-      'deploy',
+      'toolkit ls',
+      'toolkit deploy',
+      'toolkit pause',
+      'toolkit resume',
+      'toolkit rollback',
+      'toolkit rm',
       'secret set',
       'secret ls',
       'source init',
@@ -153,9 +152,9 @@ describe('dispatcher', () => {
       'source validate',
       'source sync',
       'source deploy',
-      'mcp init',
-      'mcp dev',
-      'mcp logs',
+      'toolkit init',
+      'toolkit dev',
+      'toolkit logs',
       'gql',
     ]) {
       expect(commandPaths).toContain(path);

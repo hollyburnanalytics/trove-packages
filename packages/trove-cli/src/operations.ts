@@ -283,8 +283,8 @@ export const ADD_FEED = /* GraphQL */ `
 `;
 
 /** `query mcpServers` — the user's toolkits (each a hosted MCP server); backs `mcp ls`/`secret ls`. */
-export const MCP_SERVERS = /* GraphQL */ `
-  query CliMcpServers {
+export const TOOLKITS = /* GraphQL */ `
+  query CliToolkits {
     mcpServers {
       id
       name

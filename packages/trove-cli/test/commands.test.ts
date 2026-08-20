@@ -607,15 +607,15 @@ describe('command → GraphQL mapping', () => {
     expect(mock.calls[0]?.variables.input).toMatchObject({ url: 'https://e.com', tags: ['x'] });
   });
 
-  it('mcp ls → query CliMcpServers', async () => {
+  it('toolkit ls → query CliToolkits', async () => {
     const mock = mockFetch({ data: { mcpServers: [] } });
-    await runCli(['mcp', 'ls'], mock, writer, home);
-    expect(mock.calls[0]?.operationName).toBe('CliMcpServers');
+    await runCli(['toolkit', 'ls'], mock, writer, home);
+    expect(mock.calls[0]?.operationName).toBe('CliToolkits');
   });
 
-  it('mcp pause → resolve then mutation CliPauseServer', async () => {
+  it('toolkit pause → resolve then mutation CliPauseServer', async () => {
     const mock = mockFetch((req: CapturedRequest) => {
-      if (req.operationName === 'CliMcpServers') {
+      if (req.operationName === 'CliToolkits') {
         return {
           data: {
             mcpServers: [
@@ -635,14 +635,14 @@ describe('command → GraphQL mapping', () => {
       }
       return { data: { pauseServer: { id: 's_1', name: 'srv', status: 'PAUSED' } } };
     });
-    await runCli(['mcp', 'pause', 'srv'], mock, writer, home);
+    await runCli(['toolkit', 'pause', 'srv'], mock, writer, home);
     expect(mock.calls[1]?.operationName).toBe('CliPauseServer');
     expect(mock.calls[1]?.variables.id).toBe('s_1');
   });
 
   it('secret set → mutation CliSetServerSecret (value never in argv via --from-stdin path uses --value here)', async () => {
     const mock = mockFetch((req: CapturedRequest) => {
-      if (req.operationName === 'CliMcpServers') {
+      if (req.operationName === 'CliToolkits') {
         return {
           data: {
             mcpServers: [
@@ -671,7 +671,7 @@ describe('command → GraphQL mapping', () => {
     });
   });
 
-  // `mcp deploy` and the top-level `deploy` alias run the real Bun bundler
+  // `toolkit deploy` runs the real Bun bundler
   // (defaultBundleForDeploy), so their end-to-end path — the CliDeployServer
   // payload, the enriched manifest, and full-fidelity tool metadata — is covered
   // in the Bun smoke suite (test/toolchain.smoke.test.ts). Node tests cover the

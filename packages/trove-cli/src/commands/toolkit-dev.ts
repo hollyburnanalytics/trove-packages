@@ -10,7 +10,7 @@ import { type LoadModuleOptions, loadModule, writeNew } from '../lib/bundle.js';
 import { renderJson, renderTable } from '../output.js';
 
 /**
- * The hosted-MCP dev toolchain, over `@ontrove/extend/toolkit`. `init`
+ * The toolkit dev toolchain, over `@ontrove/extend/toolkit`. `init`
  * scaffolds `manifest.json` + `server.ts`; `dev` loads `server.ts` with Bun,
  * wraps it in the SDK's runtime fetch handler, and serves it over
  * `http://127.0.0.1:<port>` so a client can connect; `logs` explains that
@@ -21,7 +21,7 @@ import { renderJson, renderTable } from '../output.js';
  */
 
 /** Injection points so tests run without the Bun loader/network. */
-export interface McpDevDeps {
+export interface ToolkitDevDeps {
   /** Module loader (transpile + import). Defaults to the Bun loader. */
   load?: <T>(entry: string, options?: LoadModuleOptions) => Promise<T>;
   /**
@@ -39,14 +39,14 @@ export interface LocalServer {
   close(): Promise<void>;
 }
 
-/** Resolve the MCP project directory from an optional path positional. */
+/** Resolve the toolkit project directory from an optional path positional. */
 function projectDir(args: ParsedArgs): string {
   const p = args.positionals[0] ?? '.';
   return isAbsolute(p) ? p : resolve(process.cwd(), p);
 }
 
 /**
- * `trove mcp init <name>` — scaffold `<name>/manifest.json` + `<name>/server.ts`
+ * `trove toolkit init <name>` — scaffold `<name>/manifest.json` + `<name>/server.ts`
  * (a `defineToolkit` stub with a sample tool, `annotations`, and `output`). No
  * GraphQL.
  *
@@ -56,7 +56,7 @@ function projectDir(args: ParsedArgs): string {
  */
 export async function init(ctx: CommandContext, args: ParsedArgs): Promise<number> {
   const name = args.positionals[0];
-  if (!name) throw usageError('Usage: trove mcp init <name>');
+  if (!name) throw usageError('Usage: trove toolkit init <name>');
   const dir = isAbsolute(name) ? name : resolve(process.cwd(), name);
   mkdirSync(dir, { recursive: true });
 
@@ -85,8 +85,10 @@ export async function init(ctx: CommandContext, args: ParsedArgs): Promise<numbe
   );
   writeNew(join(dir, 'server.ts'), serverStub(declaration));
 
-  ctx.writer.err(ctx.style.green(`✓ scaffolded MCP server '${basename(name)}' in ${dir}`));
-  ctx.writer.err(ctx.style.dim('Next: edit server.ts, then `trove mcp dev` to serve it locally.'));
+  ctx.writer.err(ctx.style.green(`✓ scaffolded toolkit '${basename(name)}' in ${dir}`));
+  ctx.writer.err(
+    ctx.style.dim('Next: edit server.ts, then `trove toolkit dev` to serve it locally.'),
+  );
   return Promise.resolve(ExitCode.Success);
 }
 
@@ -101,9 +103,9 @@ function serverStub(declaration: Record<string, unknown>): string {
   return `import { defineToolkit, z } from '@ontrove/extend/toolkit';
 
 /**
- * A hosted Trove MCP server: declare tools with a Zod \`input\` schema and a
+ * A hosted Trove toolkit: declare tools with a Zod \`input\` schema and a
  * handler. The handler receives validated args and a capability \`ctx\` (no
- * ambient authority). See the hosted-MCP SDK reference.
+ * ambient authority). See the toolkit SDK reference.
  */
 export default defineToolkit({
 ${fields},
@@ -124,7 +126,7 @@ ${fields},
 }
 
 /**
- * `trove mcp dev [path]` — load `server.ts` (Bun), wrap it with the SDK
+ * `trove toolkit dev [path]` — load `server.ts` (Bun), wrap it with the SDK
  * runtime fetch handler, and serve it over `http://127.0.0.1:<port>`. Prints the
  * local URL and the tool list. `ctx.secret`/`ctx.trove` callbacks resolve
  * against the local dev shim wired here.
@@ -140,12 +142,12 @@ ${fields},
 export async function dev(
   ctx: CommandContext,
   args: ParsedArgs,
-  deps: McpDevDeps = {},
+  deps: ToolkitDevDeps = {},
 ): Promise<number> {
   const dir = projectDir(args);
   const entry = join(dir, 'server.ts');
   if (!existsSync(entry)) {
-    throw usageError(`No server.ts in '${dir}'. Run 'trove mcp init <name>' first.`);
+    throw usageError(`No server.ts in '${dir}'. Run 'trove toolkit init <name>' first.`);
   }
   const load = deps.load ?? loadModule;
   const server = await load<ToolkitDefinition>(entry);
@@ -172,7 +174,7 @@ export async function dev(
       ),
     );
   } else {
-    ctx.writer.err(ctx.style.green(`✓ serving MCP server at ${url}`));
+    ctx.writer.err(ctx.style.green(`✓ serving toolkit at ${url}`));
     const rows = server.tools.map((t) => [
       t.name,
       t.annotations.readOnlyHint ? 'read' : 'write',
@@ -206,7 +208,7 @@ function blockUntilSignal(local: LocalServer): Promise<void> {
 
 /**
  * Start a real `127.0.0.1` HTTP server bridging Node req/res ⇄ fetch
- * Request/Response. Exported for tests; the default `serve` for `mcp dev`.
+ * Request/Response. Exported for tests; the default `serve` for `toolkit dev`.
  *
  * @param handler - The SDK fetch handler to serve.
  * @param port - The port to bind (0 for an ephemeral port).
@@ -255,7 +257,7 @@ async function handleNodeRequest(
 }
 
 /**
- * `trove mcp logs <server>` — there is no logs GraphQL operation (per-script
+ * `trove toolkit logs <server>` — there is no logs GraphQL operation (per-script
  * logs come from the deployed hosted runtime). This
  * command does not invent a fake operation: it explains where logs live and
  * points at the deployed server's endpoint.
@@ -266,7 +268,7 @@ async function handleNodeRequest(
  */
 export async function logs(ctx: CommandContext, args: ParsedArgs): Promise<number> {
   const target = args.positionals[0];
-  if (!target) throw usageError('Usage: trove mcp logs <server>');
+  if (!target) throw usageError('Usage: trove toolkit logs <server>');
 
   const message =
     'Per-script logs are produced by the deployed hosted runtime and are ' +
@@ -285,7 +287,7 @@ export async function logs(ctx: CommandContext, args: ParsedArgs): Promise<numbe
   return ExitCode.Success;
 }
 
-/** Flag specs for the mcp dev commands. */
+/** Flag specs for the toolkit dev commands. */
 export const flagSpecs = {
   init: {},
   dev: { value: ['port'], boolean: ['once'] },

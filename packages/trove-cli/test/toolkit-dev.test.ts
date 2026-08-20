@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { defineToolkit, type ToolkitDefinition, z } from '@ontrove/extend/toolkit';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import * as mcpDev from '../src/commands/mcp-dev.js';
+import * as toolkitDev from '../src/commands/toolkit-dev.js';
 import { buildContext } from '../src/context.js';
 import { ExitCode } from '../src/errors.js';
 import { parseArgs } from '../src/lib/args.js';
@@ -27,25 +27,25 @@ const server: ToolkitDefinition = defineToolkit({
 });
 
 /** A loader returning the fixed server, and a stub `serve`. */
-function deps(): mcpDev.McpDevDeps {
+function deps(): toolkitDev.ToolkitDevDeps {
   return {
     load: async <T>() => server as unknown as T,
     serve: async (_handler, port) => ({ port: port === 0 ? 9999 : port, close: async () => {} }),
   };
 }
 
-describe('mcp init', () => {
+describe('toolkit init', () => {
   let dir: string;
   let writer: CaptureWriter;
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), 'trove-mcp-'));
+    dir = mkdtempSync(join(tmpdir(), 'trove-toolkit-'));
     writer = captureWriter();
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
   it('scaffolds manifest.json + server.ts', async () => {
     const ctx = buildContext({ globals: {}, writer, isTTY: false, configEnv: { home: dir } });
-    const code = await mcpDev.init(ctx, parseArgs([join(dir, 'my-srv')]));
+    const code = await toolkitDev.init(ctx, parseArgs([join(dir, 'my-srv')]));
     expect(code).toBe(ExitCode.Success);
     const proj = join(dir, 'my-srv');
     const manifest = JSON.parse(readFileSync(join(proj, 'manifest.json'), 'utf8'));
@@ -56,12 +56,14 @@ describe('mcp init', () => {
 
   it('requires a name', async () => {
     const ctx = buildContext({ globals: {}, writer, isTTY: false, configEnv: { home: dir } });
-    await expect(mcpDev.init(ctx, parseArgs([]))).rejects.toMatchObject({ code: ExitCode.Usage });
+    await expect(toolkitDev.init(ctx, parseArgs([]))).rejects.toMatchObject({
+      code: ExitCode.Usage,
+    });
   });
 
   it('sanitizes a name with special characters into a slug', async () => {
     const ctx = buildContext({ globals: {}, writer, isTTY: false, configEnv: { home: dir } });
-    await mcpDev.init(ctx, parseArgs([join(dir, 'My Cool Server!')]));
+    await toolkitDev.init(ctx, parseArgs([join(dir, 'My Cool Server!')]));
     const manifest = JSON.parse(
       readFileSync(join(dir, 'My Cool Server!', 'manifest.json'), 'utf8'),
     );
@@ -69,11 +71,11 @@ describe('mcp init', () => {
   });
 });
 
-describe('mcp dev', () => {
+describe('toolkit dev', () => {
   let dir: string;
   let writer: CaptureWriter;
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), 'trove-mcp-'));
+    dir = mkdtempSync(join(tmpdir(), 'trove-toolkit-'));
     writer = captureWriter();
     writeFileSync(join(dir, 'server.ts'), '// server');
   });
@@ -86,7 +88,7 @@ describe('mcp dev', () => {
       isTTY: false,
       configEnv: { home: dir },
     });
-    const code = await mcpDev.dev(
+    const code = await toolkitDev.dev(
       ctx,
       parseArgs([dir, '--port', '8788', '--once'], { value: ['port'], boolean: ['once'] }),
       deps(),
@@ -99,9 +101,9 @@ describe('mcp dev', () => {
 
   it('renders a human tool table', async () => {
     const ctx = buildContext({ globals: {}, writer, isTTY: true, configEnv: { home: dir } });
-    await mcpDev.dev(ctx, parseArgs([dir, '--once'], { boolean: ['once'] }), deps());
+    await toolkitDev.dev(ctx, parseArgs([dir, '--once'], { boolean: ['once'] }), deps());
     expect(writer.stdoutText()).toContain('echo');
-    expect(writer.stderrText()).toContain('serving MCP server');
+    expect(writer.stderrText()).toContain('serving toolkit');
   });
 
   it('renders a write tool as KIND=write and surfaces titles in JSON', async () => {
@@ -121,7 +123,7 @@ describe('mcp dev', () => {
       ],
     });
     const ctx = buildContext({ globals: {}, writer, isTTY: true, configEnv: { home: dir } });
-    await mcpDev.dev(ctx, parseArgs([dir, '--once'], { boolean: ['once'] }), {
+    await toolkitDev.dev(ctx, parseArgs([dir, '--once'], { boolean: ['once'] }), {
       load: async <T>() => writeServer as unknown as T,
       serve: async (_h, port) => ({ port, close: async () => {} }),
     });
@@ -134,7 +136,7 @@ describe('mcp dev', () => {
       isTTY: false,
       configEnv: { home: dir },
     });
-    await mcpDev.dev(ctx2, parseArgs([dir, '--once'], { boolean: ['once'] }), {
+    await toolkitDev.dev(ctx2, parseArgs([dir, '--once'], { boolean: ['once'] }), {
       load: async <T>() => writeServer as unknown as T,
       serve: async (_h, port) => ({ port, close: async () => {} }),
     });
@@ -145,14 +147,14 @@ describe('mcp dev', () => {
     rmSync(join(dir, 'server.ts'));
     const ctx = buildContext({ globals: {}, writer, isTTY: false, configEnv: { home: dir } });
     await expect(
-      mcpDev.dev(ctx, parseArgs([dir, '--once'], { boolean: ['once'] }), deps()),
+      toolkitDev.dev(ctx, parseArgs([dir, '--once'], { boolean: ['once'] }), deps()),
     ).rejects.toMatchObject({ code: ExitCode.Usage });
   });
 
   it('rejects a non-server default export', async () => {
     const ctx = buildContext({ globals: {}, writer, isTTY: false, configEnv: { home: dir } });
     await expect(
-      mcpDev.dev(ctx, parseArgs([dir, '--once'], { boolean: ['once'] }), {
+      toolkitDev.dev(ctx, parseArgs([dir, '--once'], { boolean: ['once'] }), {
         load: async <T>() => ({}) as T,
         serve: async () => ({ port: 1, close: async () => {} }),
       }),
@@ -167,7 +169,7 @@ describe('mcp dev', () => {
       isTTY: false,
       configEnv: { home: dir },
     });
-    await mcpDev.dev(ctx, parseArgs([dir, '--once'], { boolean: ['once'] }), {
+    await toolkitDev.dev(ctx, parseArgs([dir, '--once'], { boolean: ['once'] }), {
       load: async <T>() => server as unknown as T,
       serve: async (handler, port) => {
         captured = handler;
@@ -192,11 +194,11 @@ describe('mcp dev', () => {
   });
 });
 
-describe('mcp dev — live serve seam', () => {
+describe('toolkit dev — live serve seam', () => {
   let dir: string;
   let writer: CaptureWriter;
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), 'trove-mcp-'));
+    dir = mkdtempSync(join(tmpdir(), 'trove-toolkit-'));
     writer = captureWriter();
     writeFileSync(join(dir, 'server.ts'), '// server');
   });
@@ -204,7 +206,7 @@ describe('mcp dev — live serve seam', () => {
 
   it('defaultServe answers a real GET (tools/list) and POST (tool call)', async () => {
     // requires live loopback: exercises the real 127.0.0.1 bridge.
-    const local = await mcpDev.defaultServe(
+    const local = await toolkitDev.defaultServe(
       (await import('@ontrove/extend/toolkit')).toFetchHandler(server),
       0,
     );
@@ -231,7 +233,7 @@ describe('mcp dev — live serve seam', () => {
       isTTY: false,
       configEnv: { home: dir },
     });
-    const promise = mcpDev.dev(ctx, parseArgs([dir]), {
+    const promise = toolkitDev.dev(ctx, parseArgs([dir]), {
       load: async <T>() => server as unknown as T,
       serve: async (_h, port) => ({
         port,
@@ -248,7 +250,7 @@ describe('mcp dev — live serve seam', () => {
   });
 });
 
-describe('mcp logs', () => {
+describe('toolkit logs', () => {
   let writer: CaptureWriter;
   beforeEach(() => {
     writer = captureWriter();
@@ -256,7 +258,7 @@ describe('mcp logs', () => {
 
   it('explains there is no log stream (human) and exits 0', async () => {
     const ctx = buildContext({ globals: {}, writer, isTTY: true, configEnv: { home: '/tmp' } });
-    const code = await mcpDev.logs(ctx, parseArgs(['my-srv']));
+    const code = await toolkitDev.logs(ctx, parseArgs(['my-srv']));
     expect(code).toBe(ExitCode.Success);
     expect(writer.stderrText()).toMatch(/hosted runtime/);
   });
@@ -268,12 +270,14 @@ describe('mcp logs', () => {
       isTTY: false,
       configEnv: { home: '/tmp' },
     });
-    await mcpDev.logs(ctx, parseArgs(['my-srv']));
+    await toolkitDev.logs(ctx, parseArgs(['my-srv']));
     expect(JSON.parse(writer.stdoutText()).available).toBe(false);
   });
 
   it('requires a server argument', async () => {
     const ctx = buildContext({ globals: {}, writer, isTTY: false, configEnv: { home: '/tmp' } });
-    await expect(mcpDev.logs(ctx, parseArgs([]))).rejects.toMatchObject({ code: ExitCode.Usage });
+    await expect(toolkitDev.logs(ctx, parseArgs([]))).rejects.toMatchObject({
+      code: ExitCode.Usage,
+    });
   });
 });

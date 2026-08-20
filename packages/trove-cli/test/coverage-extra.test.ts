@@ -2,7 +2,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { run } from '../src/cli.js';
-import * as mcp from '../src/commands/mcp.js';
+import * as toolkit from '../src/commands/toolkit.js';
 import { buildContext } from '../src/context.js';
 import { ExitCode } from '../src/errors.js';
 import { parseArgs } from '../src/lib/args.js';
@@ -54,7 +54,7 @@ function runJson(
 }
 
 /**
- * Call `mcp deploy` directly with an injected bundler — so the deploy command's
+ * Call `toolkit deploy` directly with an injected bundler — so the deploy command's
  * pure logic (slug/name derivation, human tool-name namespacing, the mutation
  * payload) is covered under Node without invoking the real Bun bundler. The real
  * bundling path is covered in the Bun smoke suite.
@@ -73,7 +73,7 @@ function deployDirect(
     isTTY: opts.human ?? false,
     configEnv: { home: home.home, env: { TROVE_TOKEN: 'tok', NO_COLOR: '1' } },
   });
-  return mcp.deploy(ctx, parseArgs(argv, mcp.flagSpecs.deploy), {
+  return toolkit.deploy(ctx, parseArgs(argv, toolkit.flagSpecs.deploy), {
     bundle: async () => ({ bundle: 'CODE', tools: [] }),
   });
 }
@@ -90,7 +90,7 @@ const server = {
   deployments: [{ id: 'dep_1', version: 'v2', status: 'LIVE', createdAt: 'now' }],
 };
 
-describe('mcp + secret human/lifecycle coverage', () => {
+describe('toolkit + secret human/lifecycle coverage', () => {
   let writer: CaptureWriter;
   let home: TempHome;
   beforeEach(() => {
@@ -99,37 +99,37 @@ describe('mcp + secret human/lifecycle coverage', () => {
   });
   afterEach(() => home.cleanup());
 
-  it('mcp ls renders a human table', async () => {
+  it('toolkit ls renders a human table', async () => {
     const mock = mockFetch({ data: { mcpServers: [server] } });
-    await runHuman(['mcp', 'ls'], mock, writer, home);
+    await runHuman(['toolkit', 'ls'], mock, writer, home);
     expect(writer.stdoutText()).toContain('SLUG');
     expect(writer.stdoutText()).toContain('srv');
   });
 
-  it('mcp resume → CliResumeServer', async () => {
+  it('toolkit resume → CliResumeServer', async () => {
     const mock = mockFetch((req: CapturedRequest) =>
-      req.operationName === 'CliMcpServers'
+      req.operationName === 'CliToolkits'
         ? { data: { mcpServers: [server] } }
         : { data: { resumeServer: { id: 's_1', name: 'srv', status: 'ACTIVE' } } },
     );
-    const code = await runHuman(['mcp', 'resume', 'srv'], mock, writer, home);
+    const code = await runHuman(['toolkit', 'resume', 'srv'], mock, writer, home);
     expect(code).toBe(ExitCode.Success);
     expect(mock.calls[1]?.operationName).toBe('CliResumeServer');
   });
 
-  it('mcp rm → CliDeleteServer', async () => {
+  it('toolkit rm → CliDeleteServer', async () => {
     const mock = mockFetch((req: CapturedRequest) =>
-      req.operationName === 'CliMcpServers'
+      req.operationName === 'CliToolkits'
         ? { data: { mcpServers: [server] } }
         : { data: { deleteServer: { id: 's_1', name: 'srv', status: 'ACTIVE' } } },
     );
-    await runJson(['mcp', 'rm', 'srv'], mock, writer, home);
+    await runJson(['toolkit', 'rm', 'srv'], mock, writer, home);
     expect(mock.calls[1]?.operationName).toBe('CliDeleteServer');
   });
 
-  it('mcp rollback → CliRollbackServer with deploymentId', async () => {
+  it('toolkit rollback → CliRollbackServer with deploymentId', async () => {
     const mock = mockFetch((req: CapturedRequest) =>
-      req.operationName === 'CliMcpServers'
+      req.operationName === 'CliToolkits'
         ? { data: { mcpServers: [server] } }
         : {
             data: {
@@ -142,24 +142,24 @@ describe('mcp + secret human/lifecycle coverage', () => {
             },
           },
     );
-    await runHuman(['mcp', 'rollback', 'srv', 'dep_old'], mock, writer, home);
+    await runHuman(['toolkit', 'rollback', 'srv', 'dep_old'], mock, writer, home);
     expect(mock.calls[1]?.operationName).toBe('CliRollbackServer');
     expect(mock.calls[1]?.variables).toMatchObject({ id: 's_1', deploymentId: 'dep_old' });
   });
 
-  it('mcp rollback requires both args', async () => {
+  it('toolkit rollback requires both args', async () => {
     const mock = mockFetch({ data: {} });
-    const code = await runJson(['mcp', 'rollback', 'srv'], mock, writer, home);
+    const code = await runJson(['toolkit', 'rollback', 'srv'], mock, writer, home);
     expect(code).toBe(ExitCode.Usage);
   });
 
-  it('mcp deploy errors when no manifest is present', async () => {
+  it('toolkit deploy errors when no manifest is present', async () => {
     const mock = mockFetch({ data: {} });
-    const code = await runJson(['mcp', 'deploy', '--dir', home.home], mock, writer, home);
+    const code = await runJson(['toolkit', 'deploy', '--dir', home.home], mock, writer, home);
     expect(code).toBe(ExitCode.Usage);
   });
 
-  it('mcp deploy prints namespaced tool names in human mode', async () => {
+  it('toolkit deploy prints namespaced tool names in human mode', async () => {
     writeFileSync(join(home.home, 'manifest.json'), JSON.stringify({ name: 'S', slug: 'my' }));
     writeFileSync(
       join(home.home, 'server.ts'),
@@ -186,7 +186,7 @@ describe('mcp + secret human/lifecycle coverage', () => {
     const file = join(home.home, 'secret.txt');
     writeFileSync(file, 'sk-from-file\n');
     const mock = mockFetch((req: CapturedRequest) =>
-      req.operationName === 'CliMcpServers'
+      req.operationName === 'CliToolkits'
         ? { data: { mcpServers: [server] } }
         : { data: { setServerSecret: true } },
     );
@@ -630,7 +630,7 @@ describe('remaining branch coverage', () => {
 
   it('secret set from --from-stdin reads the value', async () => {
     const mock = mockFetch((req: CapturedRequest) =>
-      req.operationName === 'CliMcpServers'
+      req.operationName === 'CliToolkits'
         ? { data: { mcpServers: [server] } }
         : { data: { setServerSecret: true } },
     );
@@ -662,30 +662,30 @@ describe('remaining branch coverage', () => {
 
   it('rollback human prints the resolved version', async () => {
     const mock = mockFetch((req: CapturedRequest) => {
-      if (req.operationName === 'CliMcpServers') return { data: { mcpServers: [server] } };
+      if (req.operationName === 'CliToolkits') return { data: { mcpServers: [server] } };
       return {
         data: {
           rollbackServer: { id: 's_1', name: 'srv', activeDeployment: { version: 'v1' } },
         },
       };
     });
-    await runHuman(['mcp', 'rollback', 'srv', 'dep_0'], mock, writer, home);
+    await runHuman(['toolkit', 'rollback', 'srv', 'dep_0'], mock, writer, home);
     expect(writer.stderrText()).toMatch(/rolled back/);
   });
 
-  it('mcp pause human prints a confirmation', async () => {
+  it('toolkit pause human prints a confirmation', async () => {
     const mock = mockFetch((req: CapturedRequest) => {
-      if (req.operationName === 'CliMcpServers') return { data: { mcpServers: [server] } };
+      if (req.operationName === 'CliToolkits') return { data: { mcpServers: [server] } };
       return { data: { pauseServer: { id: 's_1', name: 'srv', status: 'PAUSED' } } };
     });
-    await runHuman(['mcp', 'pause', 'srv'], mock, writer, home);
+    await runHuman(['toolkit', 'pause', 'srv'], mock, writer, home);
     expect(writer.stderrText()).toMatch(/paused/);
   });
 
   it('deploy missing name/slug in manifest is a usage error', async () => {
     writeFileSync(join(home.home, 'manifest.json'), '{}');
     const mock = mockFetch({ data: {} });
-    const code = await runJson(['mcp', 'deploy', '--dir', home.home], mock, writer, home);
+    const code = await runJson(['toolkit', 'deploy', '--dir', home.home], mock, writer, home);
     expect(code).toBe(ExitCode.Usage);
   });
 
@@ -761,18 +761,18 @@ describe('remaining branch coverage', () => {
 
   it('rollback json output', async () => {
     const mock = mockFetch((req: CapturedRequest) => {
-      if (req.operationName === 'CliMcpServers') return { data: { mcpServers: [server] } };
+      if (req.operationName === 'CliToolkits') return { data: { mcpServers: [server] } };
       return {
         data: { rollbackServer: { id: 's_1', name: 'srv', activeDeployment: { version: 'v1' } } },
       };
     });
-    await runJson(['mcp', 'rollback', 'srv', 'dep_0'], mock, writer, home);
+    await runJson(['toolkit', 'rollback', 'srv', 'dep_0'], mock, writer, home);
     expect(JSON.parse(writer.stdoutText()).name).toBe('srv');
   });
 
   it('rollback requires both positionals', async () => {
     const mock = mockFetch({ data: {} });
-    const code = await runJson(['mcp', 'rollback', 'srv'], mock, writer, home);
+    const code = await runJson(['toolkit', 'rollback', 'srv'], mock, writer, home);
     expect(code).toBe(ExitCode.Usage);
   });
 
@@ -784,7 +784,7 @@ describe('remaining branch coverage', () => {
 
   it('secret set json output', async () => {
     const mock = mockFetch((req: CapturedRequest) =>
-      req.operationName === 'CliMcpServers'
+      req.operationName === 'CliToolkits'
         ? { data: { mcpServers: [server] } }
         : { data: { setServerSecret: true } },
     );
@@ -792,24 +792,24 @@ describe('remaining branch coverage', () => {
     expect(JSON.parse(writer.stdoutText()).setServerSecret).toBe(true);
   });
 
-  it('mcp lifecycle (pause) json output', async () => {
+  it('toolkit lifecycle (pause) json output', async () => {
     const mock = mockFetch((req: CapturedRequest) => {
-      if (req.operationName === 'CliMcpServers') return { data: { mcpServers: [server] } };
+      if (req.operationName === 'CliToolkits') return { data: { mcpServers: [server] } };
       return { data: { pauseServer: { id: 's_1', name: 'srv', status: 'PAUSED' } } };
     });
-    await runJson(['mcp', 'pause', 'srv'], mock, writer, home);
+    await runJson(['toolkit', 'pause', 'srv'], mock, writer, home);
     expect(JSON.parse(writer.stdoutText()).status).toBe('PAUSED');
   });
 
-  it('mcp pause without a server is a usage error', async () => {
+  it('toolkit pause without a server is a usage error', async () => {
     const mock = mockFetch({ data: { mcpServers: [] } });
-    const code = await runJson(['mcp', 'pause'], mock, writer, home);
+    const code = await runJson(['toolkit', 'pause'], mock, writer, home);
     expect(code).toBe(ExitCode.Usage);
   });
 
-  it('mcp ls human renders a table', async () => {
+  it('toolkit ls human renders a table', async () => {
     const mock = mockFetch({ data: { mcpServers: [server] } });
-    await runHuman(['mcp', 'ls'], mock, writer, home);
+    await runHuman(['toolkit', 'ls'], mock, writer, home);
     expect(writer.stdoutText()).toContain('SLUG');
   });
 
@@ -835,7 +835,7 @@ describe('remaining branch coverage', () => {
   it('deploy missing manifest.json is a usage error', async () => {
     const mock = mockFetch({ data: {} });
     const code = await runJson(
-      ['mcp', 'deploy', '--dir', join(home.home, 'absent')],
+      ['toolkit', 'deploy', '--dir', join(home.home, 'absent')],
       mock,
       writer,
       home,
@@ -845,17 +845,17 @@ describe('remaining branch coverage', () => {
 
   it('lifecycle resolves by slug and falls back to the target name', async () => {
     const mock = mockFetch((req: CapturedRequest) => {
-      if (req.operationName === 'CliMcpServers') return { data: { mcpServers: [server] } };
+      if (req.operationName === 'CliToolkits') return { data: { mcpServers: [server] } };
       // resumeServer returns no name → human view falls back to the target.
       return { data: { resumeServer: { id: 's_1', status: 'ACTIVE' } } };
     });
-    await runHuman(['mcp', 'resume', 'srv'], mock, writer, home);
+    await runHuman(['toolkit', 'resume', 'srv'], mock, writer, home);
     expect(writer.stderrText()).toMatch(/resumed srv/);
   });
 
   it('lifecycle errors on an unknown server slug/id', async () => {
     const mock = mockFetch({ data: { mcpServers: [] } });
-    const code = await runJson(['mcp', 'rm', 'ghost'], mock, writer, home);
+    const code = await runJson(['toolkit', 'rm', 'ghost'], mock, writer, home);
     expect(code).toBe(ExitCode.Usage);
   });
 

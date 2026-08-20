@@ -4,10 +4,10 @@ import pkg from '../package.json' with { type: 'json' };
 import * as auth from './commands/auth.js';
 import * as capture from './commands/capture.js';
 import * as gqlCmd from './commands/gql.js';
-import * as mcp from './commands/mcp.js';
-import * as mcpDev from './commands/mcp-dev.js';
 import * as query from './commands/query.js';
 import * as sourceDev from './commands/source-dev.js';
+import * as toolkit from './commands/toolkit.js';
+import * as toolkitDev from './commands/toolkit-dev.js';
 import type { ConfigEnv } from './config.js';
 import type { CommandContext } from './context.js';
 import { buildContext, type GlobalFlags } from './context.js';
@@ -31,7 +31,7 @@ interface Command {
 
 /**
  * The command registry — the executable form of the command mapping table.
- * Keys are space-joined command paths (`'mcp ls'`, `'secret set'`); the
+ * Keys are space-joined command paths (`'toolkit ls'`, `'secret set'`); the
  * dispatcher matches the longest path prefix.
  */
 const COMMANDS: Record<string, Command> = {
@@ -76,24 +76,23 @@ const COMMANDS: Record<string, Command> = {
   // capture
   save: { spec: capture.flagSpecs.save, run: capture.save },
   ingest: { spec: capture.flagSpecs.ingest, run: capture.ingest },
-  // mcp remote management
-  'mcp ls': { spec: {}, run: (ctx: CommandContext): Promise<number> => mcp.ls(ctx) },
-  'mcp deploy': { spec: mcp.flagSpecs.deploy, run: mcp.deploy },
-  'mcp pause': { spec: {}, run: mcp.pause },
-  'mcp resume': { spec: {}, run: mcp.resume },
-  'mcp rollback': { spec: {}, run: mcp.rollback },
-  'mcp rm': { spec: {}, run: mcp.rm },
-  deploy: { spec: mcp.flagSpecs.deploy, run: mcp.deploy }, // alias for `mcp deploy`
-  // mcp dev (local SDK toolchain)
-  'mcp init': { spec: mcpDev.flagSpecs.init, run: mcpDev.init },
-  'mcp dev': {
-    spec: mcpDev.flagSpecs.dev,
-    run: (ctx: CommandContext, a: ParsedArgs): Promise<number> => mcpDev.dev(ctx, a),
+  // toolkit remote management
+  'toolkit ls': { spec: {}, run: (ctx: CommandContext): Promise<number> => toolkit.ls(ctx) },
+  'toolkit deploy': { spec: toolkit.flagSpecs.deploy, run: toolkit.deploy },
+  'toolkit pause': { spec: {}, run: toolkit.pause },
+  'toolkit resume': { spec: {}, run: toolkit.resume },
+  'toolkit rollback': { spec: {}, run: toolkit.rollback },
+  'toolkit rm': { spec: {}, run: toolkit.rm },
+  // toolkit dev (local SDK toolchain)
+  'toolkit init': { spec: toolkitDev.flagSpecs.init, run: toolkitDev.init },
+  'toolkit dev': {
+    spec: toolkitDev.flagSpecs.dev,
+    run: (ctx: CommandContext, a: ParsedArgs): Promise<number> => toolkitDev.dev(ctx, a),
   },
-  'mcp logs': { spec: mcpDev.flagSpecs.logs, run: mcpDev.logs },
-  // secrets
-  'secret set': { spec: mcp.flagSpecs.secretSet, run: mcp.secretSet },
-  'secret ls': { spec: {}, run: mcp.secretLs },
+  'toolkit logs': { spec: toolkitDev.flagSpecs.logs, run: toolkitDev.logs },
+  // secrets — a toolkit's, but the verb is the noun the user is acting on
+  'secret set': { spec: toolkit.flagSpecs.secretSet, run: toolkit.secretSet },
+  'secret ls': { spec: {}, run: toolkit.secretLs },
   // escape hatch
   gql: { spec: gqlCmd.flagSpecs.gql, run: gqlCmd.gql },
 };
@@ -268,12 +267,13 @@ function usage(): string {
     '',
     'Usage: trove [--profile <name>] [--endpoint <url>] [--json|--jsonl|--human] <command> [args]',
     '',
-    'Auth:    login, logout, whoami',
-    'Query:   search, discover, recent, get, list, sources, source, stats',
-    'Capture: save, ingest',
-    'Source dev: source init|dev|test|validate|sync|deploy',
-    'MCP:     mcp ls|deploy|pause|resume|rollback|rm|init|dev|logs, secret set|ls   (deploy aliased at top level)',
-    'Raw:     gql <file|->',
+    'Auth:     login, logout, whoami',
+    'Query:    search, discover, recent, get, list, sources, source, stats',
+    'Capture:  save, ingest',
+    'Sources:  source init|dev|test|validate|sync|deploy',
+    'Toolkits: toolkit ls|deploy|pause|resume|rollback|rm|init|dev|logs',
+    'Secrets:  secret set|ls',
+    'Raw:      gql <file|->',
     '',
     'Global flags: --json --jsonl --human --no-color --quiet --profile <p> --endpoint <url> --help --version',
   ].join('\n');

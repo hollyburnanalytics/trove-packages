@@ -178,7 +178,7 @@ describe('source dev loop via run() (real Bun toolchain)', () => {
   });
 });
 
-describe('mcp dev loop via run() (real Bun toolchain)', () => {
+describe('toolkit dev loop via run() (real Bun toolchain)', () => {
   let writer: CaptureWriter;
   let home: TempHome;
   let proj: string;
@@ -192,32 +192,37 @@ describe('mcp dev loop via run() (real Bun toolchain)', () => {
     rmSync(proj, { recursive: true, force: true });
   });
 
-  it('mcp init then dev --once serves locally over a real socket', async () => {
+  it('toolkit init then dev --once serves locally over a real socket', async () => {
     const mock = mockFetch({});
-    await runCli(['mcp', 'init', join(proj, 'srv')], mock, writer, home);
+    await runCli(['toolkit', 'init', join(proj, 'srv')], mock, writer, home);
     const w2 = captureWriter();
-    const code = await runCli(['mcp', 'dev', join(proj, 'srv'), '--once'], mock, w2, home);
+    const code = await runCli(['toolkit', 'dev', join(proj, 'srv'), '--once'], mock, w2, home);
     expect(code).toBe(ExitCode.Success);
     expect(JSON.parse(w2.stdoutText()).url).toContain('127.0.0.1');
   });
 
-  it('mcp dev serves a hand-written server', async () => {
+  it('toolkit dev serves a hand-written server', async () => {
     writeFileSync(join(proj, 'server.ts'), SERVER_SRC);
     const mock = mockFetch({});
-    const code = await runCli(['mcp', 'dev', proj, '--once', '--port', '0'], mock, writer, home);
+    const code = await runCli(
+      ['toolkit', 'dev', proj, '--once', '--port', '0'],
+      mock,
+      writer,
+      home,
+    );
     expect(code).toBe(ExitCode.Success);
     expect(JSON.parse(writer.stdoutText()).tools[0].name).toBe('ping');
   });
 
-  it('mcp logs explains the hosted-runtime log gap (exit 0)', async () => {
+  it('toolkit logs explains the hosted-runtime log gap (exit 0)', async () => {
     const mock = mockFetch({});
-    const code = await runCli(['mcp', 'logs', 'srv'], mock, writer, home);
+    const code = await runCli(['toolkit', 'logs', 'srv'], mock, writer, home);
     expect(code).toBe(ExitCode.Success);
     expect(JSON.parse(writer.stdoutText()).available).toBe(false);
   });
 });
 
-describe('mcp deploy bundling (real Bun bundler + embedded @ontrove/extend/toolkit)', () => {
+describe('toolkit deploy bundling (real Bun bundler + embedded @ontrove/extend/toolkit)', () => {
   let proj: string;
   beforeEach(() => {
     proj = mkdtempSync(join(tmpdir(), 'trove-proj-'));
@@ -247,7 +252,7 @@ describe('mcp deploy bundling (real Bun bundler + embedded @ontrove/extend/toolk
   });
 });
 
-describe('mcp deploy via run() (real Bun bundler, mocked GraphQL)', () => {
+describe('toolkit deploy via run() (real Bun bundler, mocked GraphQL)', () => {
   let writer: CaptureWriter;
   let home: TempHome;
   beforeEach(() => {
@@ -276,7 +281,7 @@ describe('mcp deploy via run() (real Bun bundler, mocked GraphQL)', () => {
     );
     writeFileSync(join(home.home, 'server.ts'), SERVER_SRC);
     const mock = mockFetch(deployResponse([{ name: 'ping', description: null }]));
-    const code = await runCli(['mcp', 'deploy', '--dir', home.home], mock, writer, home);
+    const code = await runCli(['toolkit', 'deploy', '--dir', home.home], mock, writer, home);
     expect(code).toBe(ExitCode.Success);
     expect(mock.calls[0]?.operationName).toBe('CliDeployServer');
     expect(mock.calls[0]?.variables).toMatchObject({ name: 'My Srv', slug: 'my-srv' });

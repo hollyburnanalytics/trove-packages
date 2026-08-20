@@ -90,7 +90,7 @@ export interface UserStats {
 }
 
 /** A toolkit deployment record (each toolkit runs as a hosted MCP server), as selected by `mcpServers`. */
-export interface McpServer {
+export interface Toolkit {
   id: string;
   name: string;
   slug: string;

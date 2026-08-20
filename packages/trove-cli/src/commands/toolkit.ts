@@ -6,10 +6,10 @@ import { flag, type ParsedArgs } from '../lib/args.js';
 import { bundleServer, type ServerBundle } from '../lib/bundle.js';
 import * as ops from '../operations.js';
 import { renderJson, renderTable } from '../output.js';
-import type { McpServer } from '../types.js';
+import type { Toolkit } from '../types.js';
 
 /**
- * Resolve a server slug/id argument to the server's id via `mcpServers`.
+ * Resolve a toolkit slug/id argument to its id via the `mcpServers` field.
  *
  * @param ctx - The command context.
  * @param slugOrId - The server slug or id.
@@ -19,23 +19,23 @@ import type { McpServer } from '../types.js';
 async function resolveServerId(ctx: CommandContext, slugOrId: string): Promise<string> {
   const data = await ctx
     .client()
-    .request<{ mcpServers: McpServer[] }>(
-      { query: ops.MCP_SERVERS, operationName: 'CliMcpServers' },
+    .request<{ mcpServers: Toolkit[] }>(
+      { query: ops.TOOLKITS, operationName: 'CliToolkits' },
       true,
     );
   const match =
     data.mcpServers.find((s) => s.id === slugOrId) ??
     data.mcpServers.find((s) => s.slug === slugOrId);
-  if (!match) throw usageError(`No MCP server matching '${slugOrId}'.`);
+  if (!match) throw usageError(`No toolkit matching '${slugOrId}'.`);
   return match.id;
 }
 
-/** `trove mcp ls` → `query mcpServers`. */
+/** `trove toolkit ls` → `query mcpServers`. */
 export async function ls(ctx: CommandContext): Promise<number> {
   const data = await ctx
     .client()
-    .request<{ mcpServers: McpServer[] }>(
-      { query: ops.MCP_SERVERS, operationName: 'CliMcpServers' },
+    .request<{ mcpServers: Toolkit[] }>(
+      { query: ops.TOOLKITS, operationName: 'CliToolkits' },
       true,
     );
   if (ctx.output.format !== 'human') {
@@ -57,7 +57,7 @@ export async function ls(ctx: CommandContext): Promise<number> {
 }
 
 /**
- * `trove mcp deploy` (alias `trove deploy`) → `mutation deployServer`.
+ * `trove toolkit deploy` → `mutation deployServer`.
  *
  * Reads `manifest.json` from the project directory (`--dir`, default `.`),
  * bundles `server.ts` locally (Bun), uploads the bundle through a
@@ -101,14 +101,14 @@ export async function deploy(
   const dir = flag(args, 'dir') ?? '.';
   const manifestPath = join(dir, 'manifest.json');
   if (!existsSync(manifestPath)) {
-    throw usageError(`No manifest.json in '${dir}'. Run 'trove mcp init <name>' first.`);
+    throw usageError(`No manifest.json in '${dir}'. Run 'trove toolkit init <name>' first.`);
   }
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>;
   const { name, slug } = resolveNameAndSlug(args, manifest);
 
   const serverEntry = join(dir, 'server.ts');
   if (!existsSync(serverEntry)) {
-    throw usageError(`No server.ts in '${dir}'. Run 'trove mcp init <name>' first.`);
+    throw usageError(`No server.ts in '${dir}'. Run 'trove toolkit init <name>' first.`);
   }
   ctx.writer.err(ctx.style.dim(`Bundling ${serverEntry}…`));
 
@@ -139,17 +139,17 @@ export async function deploy(
   return ExitCode.Success;
 }
 
-/** `trove mcp pause <server>` → `mutation pauseServer`. */
+/** `trove toolkit pause <server>` → `mutation pauseServer`. */
 export async function pause(ctx: CommandContext, args: ParsedArgs): Promise<number> {
   return lifecycle(ctx, args, ops.PAUSE_SERVER, 'CliPauseServer', 'pauseServer', 'paused');
 }
 
-/** `trove mcp resume <server>` → `mutation resumeServer`. */
+/** `trove toolkit resume <server>` → `mutation resumeServer`. */
 export async function resume(ctx: CommandContext, args: ParsedArgs): Promise<number> {
   return lifecycle(ctx, args, ops.RESUME_SERVER, 'CliResumeServer', 'resumeServer', 'resumed');
 }
 
-/** `trove mcp rm <server>` → `mutation deleteServer` (soft-delete). */
+/** `trove toolkit rm <server>` → `mutation deleteServer` (soft-delete). */
 export async function rm(ctx: CommandContext, args: ParsedArgs): Promise<number> {
   return lifecycle(ctx, args, ops.DELETE_SERVER, 'CliDeleteServer', 'deleteServer', 'deleted');
 }
@@ -164,7 +164,7 @@ async function lifecycle(
   verb: string,
 ): Promise<number> {
   const target = args.positionals[0];
-  if (!target) throw usageError(`Usage: trove mcp ${verb.replace(/d$/, '')} <server>`);
+  if (!target) throw usageError(`Usage: trove toolkit ${verb.replace(/d$/, '')} <server>`);
   const id = await resolveServerId(ctx, target);
   const data = await ctx
     .client()
@@ -182,11 +182,11 @@ async function lifecycle(
   return ExitCode.Success;
 }
 
-/** `trove mcp rollback <server> <deploymentId>` → `mutation rollbackServer`. */
+/** `trove toolkit rollback <server> <deploymentId>` → `mutation rollbackServer`. */
 export async function rollback(ctx: CommandContext, args: ParsedArgs): Promise<number> {
   const [target, deploymentId] = args.positionals;
   if (!target || !deploymentId) {
-    throw usageError('Usage: trove mcp rollback <server> <deploymentId>');
+    throw usageError('Usage: trove toolkit rollback <server> <deploymentId>');
   }
   const id = await resolveServerId(ctx, target);
   const data = await ctx.client().request<{
@@ -266,8 +266,8 @@ export async function secretLs(ctx: CommandContext, args: ParsedArgs): Promise<n
   if (!target) throw usageError('Usage: trove secret ls <server>');
   const data = await ctx
     .client()
-    .request<{ mcpServers: McpServer[] }>(
-      { query: ops.MCP_SERVERS, operationName: 'CliMcpServers' },
+    .request<{ mcpServers: Toolkit[] }>(
+      { query: ops.TOOLKITS, operationName: 'CliToolkits' },
       true,
     );
   const server = data.mcpServers.find((s) => s.id === target || s.slug === target);

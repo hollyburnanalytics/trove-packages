@@ -394,7 +394,7 @@ function requireEgress(manifest: Record<string, unknown>, manifestPath: string):
  * hand it to `mutation deploySource`, so the source runs on Trove's schedule
  * instead of only while the author's machine is awake.
  *
- * The sibling of `trove mcp deploy`. Unlike `source sync`, which runs the sync
+ * The sibling of `trove toolkit deploy`. Unlike `source sync`, which runs the sync
  * here and pushes the documents, this uploads the source itself — after which
  * nothing local is involved in a sync.
  *

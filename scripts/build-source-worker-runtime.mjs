@@ -3,7 +3,7 @@
  * Generate the embedded source worker runtime for the compiled CLI binary.
  *
  * The sibling of `build-mcp-worker-runtime.mjs`, for the other deployable. That
- * one pre-bundles `@ontrove/extend/toolkit` so `trove mcp deploy` can wrap a `server.ts`;
+ * one pre-bundles `@ontrove/extend/toolkit` so `trove toolkit deploy` can wrap a `server.ts`;
  * this one pre-bundles the source shim (`src/runtime/source-shim.ts`, which
  * pulls in `@ontrove/extend/source`'s `runSource`) so `trove source deploy` can wrap an
  * `index.ts`. In the Bun single-binary distribution there is no on-disk

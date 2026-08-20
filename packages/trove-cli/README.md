@@ -80,10 +80,10 @@ trove source sync --source "My Blog" --feed default --create   # → ingestDocum
 trove source deploy                           # → deploySource; Trove runs it on a schedule
 
 # Toolkits (@ontrove/extend/toolkit)
-trove mcp init my-server                 # scaffold manifest.json + server.ts
+trove toolkit init my-server                 # scaffold manifest.json + server.ts
 cd my-server
-trove mcp dev --port 8788                # bundle + serve over http://127.0.0.1:8788
-trove mcp deploy                         # mutation deployServer (PROPOSED runtime)
+trove toolkit dev --port 8788                # bundle + serve over http://127.0.0.1:8788
+trove toolkit deploy                         # mutation deployServer (PROPOSED runtime)
 ```
 
 ## Output & scripting
@@ -153,13 +153,13 @@ overrides a profile's `api_url`.
 | `source validate` | — (`validateSourceManifest`) | Local |
 | `source sync` | `mutation ingestDocuments` (+ `createSource`/`addFeed` w/ `--create`) | Write |
 | `source deploy` | `mutation deploySource` | Write |
-| `mcp init` | — (scaffold `@ontrove/extend/toolkit` project) | Local |
-| `mcp dev` | — (local server over `127.0.0.1`) | Local |
-| `mcp logs` | — (explains the deployed runtime log gap) | Info |
-| `mcp ls` | `query mcpServers` | Read |
-| `mcp deploy` / `deploy` | `mutation deployServer` | Write |
-| `mcp pause` / `resume` / `rm` | `pauseServer` / `resumeServer` / `deleteServer` | Write |
-| `mcp rollback` | `mutation rollbackServer` | Write |
+| `toolkit init` | — (scaffold `@ontrove/extend/toolkit` project) | Local |
+| `toolkit dev` | — (local server over `127.0.0.1`) | Local |
+| `toolkit logs` | — (explains the deployed runtime log gap) | Info |
+| `toolkit ls` | `query mcpServers` | Read |
+| `toolkit deploy` / `deploy` | `mutation deployServer` | Write |
+| `toolkit pause` / `resume` / `rm` | `pauseServer` / `resumeServer` / `deleteServer` | Write |
+| `toolkit rollback` | `mutation rollbackServer` | Write |
 | `secret set` | `mutation setServerSecret` | Write |
 | `secret ls` | `query mcpServers` (`secrets` — names only) | Read |
 | `gql <file\|->` | _arbitrary, user-supplied_ | Escape hatch |
@@ -167,7 +167,7 @@ overrides a profile's `api_url`.
 The toolkit management commands (`mcp deploy/pause/resume/rollback/rm`,
 `secret set/ls`) wrap the corresponding GraphQL mutations; the **deployed
 runtime** (where each request runs in an isolated sandbox) is still **PROPOSED**,
-so `mcp logs` has no GraphQL operation to call —
+so `toolkit logs` has no GraphQL operation to call —
 it explains that per-script logs come from the deployed runtime and points there
 rather than inventing a fake op. Everything else — the `source init/dev/test/
 validate/sync/deploy` and `mcp init/dev` local toolchain, `login`'s loopback OAuth

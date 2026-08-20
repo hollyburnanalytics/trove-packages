@@ -1,6 +1,6 @@
 {
   "name": "@ontrove/extend",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "The standard library for extending Trove — `defineSource` and `defineToolkit`, the capability object each is handed, the guarded fetch they share, and the manifest vocabulary both are held to.",
   "type": "module",
   "license": "MIT",

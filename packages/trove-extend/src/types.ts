@@ -131,6 +131,16 @@ export interface Document {
    * becomes `transcript` automatically).
    */
   contentType?: SourceContentType;
+  /**
+   * A second rendering to fall back to when the primary one is unusable.
+   *
+   * arXiv is the case it exists for: a paper's HTML carries readable `$…$`
+   * maths, the same equation out of the PDF is glyph soup, and a two-column
+   * PDF welds paragraphs together — but the HTML only exists for recent
+   * papers. So the source offers the HTML and names the PDF as the fallback,
+   * and the platform uses it when the primary fetch fails or yields nothing.
+   */
+  fallback?: { fileUrl: string; mimeType: string };
 }
 
 /**
@@ -207,13 +217,49 @@ export interface SourceSyncResult {
    */
   feedUrl?: string;
   /**
-   * How much work this run did and how much is left.
+   * What this run did, as counters.
    *
-   * `remaining > 0` is what tells the runner to drain again rather than wait
-   * for the next scheduled tick, so a backfill finishes in one sitting instead
-   * of one page per interval.
+   * **`remaining` is the only key anything reads** — the runner drains on it.
+   * The rest are a source's own bookkeeping, useful when a run is being
+   * debugged and inert otherwise; `blocked`, `waiting`, `unparseable`, `saved`
+   * and `duration_ms` are all in use. The named fields below are the ones
+   * enough sources share to be worth documenting, not a closed set — which is
+   * why the index signature is here rather than a fifth, sixth and seventh
+   * field being added one failing typecheck at a time.
+   *
+   * Counters, though: prose belongs in `ctx.log`, which is persisted as the run
+   * transcript and shown to the user. A source that put a `string[]` of
+   * warnings here was duplicating lines it had already logged, into a field
+   * nothing reads.
    */
-  stats?: { fetched?: number; remaining?: number };
+  stats?: {
+    /** How many documents this run produced. */
+    fetched?: number;
+    /**
+     * How many the source knows are still waiting, when it can tell.
+     *
+     * The number the runner drains on: `> 0` means go again now rather than
+     * wait for the next scheduled tick, so a backfill finishes in one sitting.
+     * This is the ONE key with behaviour attached — spell it right.
+     */
+    remaining?: number;
+    /**
+     * How many candidates this run passed over — already seen, out of window,
+     * or filtered out by config. Reported so a run that returns nothing can be
+     * told apart from a run that found nothing.
+     */
+    skipped?: number;
+    /**
+     * How many of the returned documents carry no usable date.
+     *
+     * A date-cursor source cannot resume past an undated document, so a feed
+     * quietly producing them is a feed that will re-read the same window
+     * forever.
+     */
+    undated?: number;
+    /** Any other counter this source finds worth reporting. */
+    [counter: string]: number | undefined;
+  };
 }
 
 /**
@@ -274,20 +320,32 @@ export interface ExtensionCache {
 
 export interface ExtensionContext {
   /**
-   * A credential the manifest declared, by name.
+   * A credential the manifest declared, by name — **`undefined` when it is not
+   * set**.
    *
    * Resolves whether the value was pasted by the user or is a token Trove
    * refreshed a moment ago — the extension cannot tell, and must not need to.
    * That is what keeps delegated authorization out of every author's code.
+   * Async for the same reason: resolving may be a vault read or a refresh.
    *
-   * Async because resolving may involve a vault read or a token refresh.
-   * Rejects when the name was never declared in the manifest, which is a
-   * programming error rather than a runtime condition.
+   * This is the reader for a credential the extension can work without — an
+   * optional API key that raises a rate limit, an OAuth client secret a public
+   * client does not have. When the extension cannot proceed without the value,
+   * use {@link requireSecret} and let it raise.
+   *
+   * Until 3.3.0 this rejected, and `requireSecret` was documented as behaving
+   * "identically; the name is the documentation" — so there were two names for
+   * one behaviour and no way at all to read an optional credential. The two
+   * sources that had one reached around the whole mechanism into the legacy
+   * `ctx.credentials` bag instead.
    */
-  secret(name: string): Promise<string>;
+  secret(name: string): Promise<string | undefined>;
   /**
-   * {@link secret}, but stating plainly that the extension cannot proceed
-   * without it. Behaves identically; the name is the documentation.
+   * {@link secret}, for a credential the extension genuinely cannot proceed
+   * without: rejects, naming the credential, rather than resolving `undefined`.
+   *
+   * Prefer it to `if (!(await ctx.secret(n))) throw` — the failure message is
+   * the useful half, and the host writes a better one than each extension will.
    */
   requireSecret(name: string): Promise<string>;
   /**

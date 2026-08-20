@@ -108,6 +108,34 @@ describe('toWireDocument', () => {
     });
   });
 
+  it('carries every field the ingest door accepts — the drop is always silent', () => {
+    // Twice now a field has survived the local path and vanished on the
+    // deployed one with nothing said: `contentType` indexed bookmarks as plain
+    // text, and `fallback` would have dropped arXiv's PDF behind its HTML. The
+    // failure mode is a mapper that omits, so assert the whole surface rather
+    // than the field of the day.
+    const wire = toWireDocument({
+      id: 'p1',
+      title: 'A paper',
+      text: 'body',
+      fileUrl: 'https://arxiv.test/html/1',
+      mimeType: 'text/html',
+      captureOnly: false,
+      contentType: 'text',
+      fallback: { fileUrl: 'https://arxiv.test/pdf/1', mimeType: 'application/pdf' },
+    });
+    expect(wire).toEqual({
+      id: 'p1',
+      title: 'A paper',
+      text: 'body',
+      file_url: 'https://arxiv.test/html/1',
+      mime_type: 'text/html',
+      capture_only: false,
+      content_type: 'text',
+      fallback: { file_url: 'https://arxiv.test/pdf/1', mime_type: 'application/pdf' },
+    });
+  });
+
   it('refuses an untitled document, naming it', () => {
     // `title` is required by the type now, so the missing-title case has to be
     // constructed deliberately — which is the point: an author cannot reach
@@ -200,13 +228,28 @@ describe('createSourceWorker', () => {
     expect(json.documents).toEqual([{ id: 'a', title: 'sk-1', text: 'body' }]);
   });
 
-  it('refuses by name a credential the source did not declare', async () => {
+  it('never hands back a credential the source did not ask for by name', async () => {
     // The map goes in; only `secret(name)` comes out. A source cannot enumerate
-    // what it was handed, so asking for the wrong name fails loudly instead of
-    // reading another source's key out of the same bag.
+    // what it was handed, so the wrong name yields nothing rather than reading
+    // another source's key out of the same bag. That isolation is the point of
+    // the accessor; `undefined` versus a throw is a separate question, and
+    // `requireSecret` below is the half that answers it.
+    let seen: string | undefined = 'untouched';
     const source: TroveSource = {
       async sync(ctx) {
-        await ctx.secret('OTHER_TOKEN');
+        seen = await ctx.secret('OTHER_TOKEN');
+        return [];
+      },
+    };
+    const { status } = await invoke(source, { credentials: { API_KEY: 'sk-1' } });
+    expect(status).toBe(200);
+    expect(seen).toBeUndefined();
+  });
+
+  it('refuses by name from requireSecret, where the source cannot proceed', async () => {
+    const source: TroveSource = {
+      async sync(ctx) {
+        await ctx.requireSecret('OTHER_TOKEN');
         return [];
       },
     };

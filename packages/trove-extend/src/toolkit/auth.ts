@@ -50,7 +50,7 @@ function withDefaultUserAgent(init?: RequestInit): RequestInit {
  */
 export function makeRequireSecret(secret: ToolContext['secret']): ToolContext['requireSecret'] {
   return async (name: string): Promise<string> => {
-    let value: string;
+    let value: string | undefined;
     try {
       value = await secret(name);
     } catch {

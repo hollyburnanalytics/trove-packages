@@ -247,7 +247,25 @@ describe('the context spine that both SDKs share', () => {
     expect(seen).toBe('tok');
   });
 
-  it('rejects by name rather than resolving undefined', async () => {
+  it('resolves undefined for an unset credential, so an optional one can be read', async () => {
+    // The reader for a credential the source can work without: YouTube's API key
+    // raises a quota it already has without, X's OAuth client secret is absent
+    // for a public client. Both sources reached around this into the legacy
+    // `ctx.credentials` bag while `secret` could only reject.
+    let seen: string | undefined = 'untouched';
+    await runSource(
+      {
+        async sync(ctx) {
+          seen = await ctx.secret('OPTIONAL_KEY');
+          return [];
+        },
+      },
+      {},
+    );
+    expect(seen).toBeUndefined();
+  });
+
+  it('rejects by name from requireSecret, where the source cannot proceed', async () => {
     // A source that needs a key cannot proceed without one, so `undefined` only
     // moves the failure downstream — into a 401 that points at the upstream API
     // instead of at the credential nobody set.
@@ -255,7 +273,7 @@ describe('the context spine that both SDKs share', () => {
       runSource(
         {
           async sync(ctx) {
-            await ctx.secret('MISSING_KEY');
+            await ctx.requireSecret('MISSING_KEY');
             return [];
           },
         },
@@ -264,7 +282,21 @@ describe('the context spine that both SDKs share', () => {
     ).rejects.toThrow(/MISSING_KEY/);
   });
 
-  it('treats requireSecret as the same door', async () => {
+  it('rejects an empty credential too, not merely an absent one', async () => {
+    await expect(
+      runSource(
+        {
+          async sync(ctx) {
+            await ctx.requireSecret('BLANK');
+            return [];
+          },
+        },
+        { secrets: { BLANK: '' } },
+      ),
+    ).rejects.toThrow(/BLANK/);
+  });
+
+  it('returns the value from requireSecret when it is set', async () => {
     let seen = '';
     await runSource(
       {

@@ -1,5 +1,4 @@
-import type { Document } from '@ontrove/extend/source';
-import { defineSource } from '@ontrove/extend/source';
+import type { Document, TroveSource } from '@ontrove/extend/source';
 import { afterAll, describe, expect, it } from 'vitest';
 import {
   createSourceWorker,
@@ -122,7 +121,7 @@ describe('toWireDocument', () => {
 
 describe('createSourceWorker', () => {
   it('serves documents, cursor and logs for one invoke', async () => {
-    const source = defineSource({
+    const source: TroveSource = {
       async sync(ctx) {
         ctx.log('fetched', 1);
         expect(ctx.config).toEqual({ feedUrl: 'https://a.test' });
@@ -132,7 +131,7 @@ describe('createSourceWorker', () => {
           cursor: { type: 'date', value: '2026-02-01' } as const,
         };
       },
-    });
+    };
     const { status, json } = await invoke(source, {
       config: { feedUrl: 'https://a.test' },
       credentials: {},
@@ -148,36 +147,36 @@ describe('createSourceWorker', () => {
   });
 
   it('omits the cursor when the source advanced none, so the stored one holds', async () => {
-    const source = defineSource({
+    const source: TroveSource = {
       async sync() {
         return [{ id: 'a', title: 'A', text: 'body' }];
       },
-    });
+    };
     const { json } = await invoke(source, {});
     expect(json).not.toHaveProperty('cursor');
     expect(json.documents).toHaveLength(1);
   });
 
   it('dedups by id, exactly as the local dev loop does', async () => {
-    const source = defineSource({
+    const source: TroveSource = {
       async sync() {
         return [
           { id: 'a', title: 'A', text: 'one' },
           { id: 'a', title: 'A again', text: 'two' },
         ];
       },
-    });
+    };
     const { json } = await invoke(source, {});
     expect(json.documents).toEqual([{ id: 'a', title: 'A', text: 'one' }]);
   });
 
   it('answers a thrown sync with a 500 carrying the logs so far', async () => {
-    const source = defineSource({
+    const source: TroveSource = {
       async sync(ctx) {
         ctx.log('starting');
         throw new Error('upstream is down');
       },
-    });
+    };
     const { status, json } = await invoke(source, {});
     // Never `{documents: []}` — that reads to the runner as a successful empty
     // sync, and the cursor would advance past what was never fetched.
@@ -190,12 +189,12 @@ describe('createSourceWorker', () => {
     // the spine had no credential channel. It grew `secret(name)` and this shim
     // did not follow, so a working source was being turned away with a message
     // telling its author to run it on a Mac.
-    const source = defineSource({
+    const source: TroveSource = {
       async sync(ctx) {
         const key = await ctx.secret('API_KEY');
         return [{ id: 'a', title: key, text: 'body' }];
       },
-    });
+    };
     const { status, json } = await invoke(source, { credentials: { API_KEY: 'sk-1' } });
     expect(status).toBe(200);
     expect(json.documents).toEqual([{ id: 'a', title: 'sk-1', text: 'body' }]);
@@ -205,12 +204,12 @@ describe('createSourceWorker', () => {
     // The map goes in; only `secret(name)` comes out. A source cannot enumerate
     // what it was handed, so asking for the wrong name fails loudly instead of
     // reading another source's key out of the same bag.
-    const source = defineSource({
+    const source: TroveSource = {
       async sync(ctx) {
         await ctx.secret('OTHER_TOKEN');
         return [];
       },
-    });
+    };
     const { status, json } = await invoke(source, { credentials: { API_KEY: 'sk-1' } });
     expect(status).toBe(500);
     expect(String(json.error)).toMatch(/OTHER_TOKEN/);
@@ -223,12 +222,12 @@ describe('createSourceWorker', () => {
     // source reads on the Mac.
     const before = Date.now();
     let seen = 0;
-    const source = defineSource({
+    const source: TroveSource = {
       async sync(ctx) {
         seen = ctx.deadline;
         return [];
       },
-    });
+    };
     const { status } = await invoke(source, { deadlineMs: 45_000 });
     expect(status).toBe(200);
     expect(seen).toBeGreaterThanOrEqual(before + 45_000);
@@ -245,22 +244,22 @@ describe('createSourceWorker', () => {
   });
 
   it('reports a non-Error throw rather than losing it', async () => {
-    const source = defineSource({
+    const source: TroveSource = {
       async sync() {
         throw 'plain string';
       },
-    });
+    };
     const { status, json } = await invoke(source, {});
     expect(status).toBe(500);
     expect(json.error).toBe('plain string');
   });
 
   it('404s anything that is not POST /sync', async () => {
-    const source = defineSource({
+    const source: TroveSource = {
       async sync() {
         return [];
       },
-    });
+    };
     const worker = createSourceWorker(source);
     const wrongPath = await worker.fetch(new Request('https://invoke/other', { method: 'POST' }));
     expect(wrongPath.status).toBe(404);
@@ -269,11 +268,11 @@ describe('createSourceWorker', () => {
   });
 
   it('installs the redirect policy on the global fetch, once', () => {
-    const empty = defineSource({
+    const empty = {
       async sync() {
         return [];
       },
-    });
+    };
     createSourceWorker(empty);
     const installed = globalThis.fetch;
     expect(installed).not.toBe(originalFetch);
@@ -290,12 +289,12 @@ describe('createSourceWorker', () => {
       return new Response('body');
     }) as unknown as typeof globalThis.fetch;
 
-    const source = defineSource({
+    const source: TroveSource = {
       async sync(ctx) {
         const res = await ctx.fetch('https://a.test/feed');
         return [{ id: 'a', title: 'A', text: await res.text() }];
       },
-    });
+    };
     const result: SourceInvokeResult = await handleInvoke(source, {}, []);
     expect(result.documents[0]?.text).toBe('body');
     expect(seen).toEqual(['https://a.test/feed']);

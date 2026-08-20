@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { defineSource } from '../../src/source/define.js';
 import { runSource } from '../../src/source/runtime.js';
-import type { Document } from '../../src/types.js';
+import type { Document, TroveSource } from '../../src/types.js';
 
 /**
  * The `IngestDocumentInput` wire shape (schema.graphql). `externalId` is the only
@@ -29,7 +28,7 @@ function toIngestInput(doc: Document): IngestDocumentInput {
 
 describe('Document → IngestDocumentInput mapping', () => {
   it('maps id to externalId and carries every other field 1:1', async () => {
-    const source = defineSource({
+    const source: TroveSource = {
       async sync() {
         return [
           {
@@ -45,7 +44,7 @@ describe('Document → IngestDocumentInput mapping', () => {
           },
         ];
       },
-    });
+    };
 
     const { documents } = await runSource(source);
     const input = toIngestInput(documents[0] as Document);
@@ -66,7 +65,7 @@ describe('Document → IngestDocumentInput mapping', () => {
   });
 
   it('maps an audio document (audioUrl, no text) for transcription', async () => {
-    const source = defineSource({
+    const source: TroveSource = {
       async sync() {
         return [
           {
@@ -78,7 +77,7 @@ describe('Document → IngestDocumentInput mapping', () => {
           },
         ];
       },
-    });
+    };
 
     const { documents } = await runSource(source);
     const input = toIngestInput(documents[0] as Document);

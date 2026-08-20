@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { defineToolkit } from '../../src/toolkit/define.js';
 import { z } from '../../src/toolkit/index.js';
 import type { ToolCall } from '../../src/toolkit/types.js';
+import { TOOLKIT_META } from './meta.js';
 
 /** Build a JSON Response like a callback server would. */
 function jsonResponse(body: unknown, status = 200): Response {
@@ -28,6 +29,7 @@ describe('ctx.secret', () => {
     let captured = '';
     const server = defineToolkit(
       {
+        ...TOOLKIT_META,
         tools: [
           {
             name: 't',
@@ -61,6 +63,7 @@ describe('ctx.secret', () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ value: 'v' }));
     const server = defineToolkit(
       {
+        ...TOOLKIT_META,
         tools: [
           {
             name: 't',
@@ -81,6 +84,7 @@ describe('ctx.secret', () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ error: 'denied' }, 403));
     const server = defineToolkit(
       {
+        ...TOOLKIT_META,
         tools: [
           {
             name: 't',
@@ -100,6 +104,7 @@ describe('ctx.secret', () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ value: 123 }));
     const server = defineToolkit(
       {
+        ...TOOLKIT_META,
         tools: [
           {
             name: 't',
@@ -119,6 +124,7 @@ describe('ctx.secret', () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ value: 'v' }));
     const server = defineToolkit(
       {
+        ...TOOLKIT_META,
         tools: [
           {
             name: 't',
@@ -140,6 +146,7 @@ describe('ctx.trove', () => {
   it('is undefined when no trove scope is granted', async () => {
     let troveDefined = true;
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 't',
@@ -161,6 +168,7 @@ describe('ctx.trove', () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ data: results }));
     const server = defineToolkit(
       {
+        ...TOOLKIT_META,
         tools: [
           {
             name: 't',
@@ -194,6 +202,7 @@ describe('ctx.trove', () => {
       .mockResolvedValueOnce(jsonResponse({ data: { ingested: 2 } }));
     const server = defineToolkit(
       {
+        ...TOOLKIT_META,
         tools: [
           {
             name: 't',
@@ -230,6 +239,7 @@ describe('ctx.trove', () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ data: null }));
     const server = defineToolkit(
       {
+        ...TOOLKIT_META,
         tools: [
           {
             name: 't',
@@ -254,6 +264,7 @@ describe('ctx.fetch & ctx.log', () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ status: 'shipped' }));
     const server = defineToolkit(
       {
+        ...TOOLKIT_META,
         tools: [
           {
             name: 't',
@@ -283,6 +294,7 @@ describe('ctx.fetch & ctx.log', () => {
 
   it('ctx.log does not throw and does not leak to the model result', async () => {
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 't',
@@ -302,6 +314,7 @@ describe('ctx.fetch & ctx.log', () => {
   it('exposes the authenticated userId to the handler', async () => {
     let seen = '';
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 't',
@@ -329,6 +342,7 @@ describe('the context spine a toolkit shares with a source', () => {
   ): Promise<unknown> {
     let seen: unknown;
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 't',

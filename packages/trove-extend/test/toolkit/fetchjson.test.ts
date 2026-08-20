@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { defineToolkit } from '../../src/toolkit/define.js';
 import { ToolError, z } from '../../src/toolkit/index.js';
 import type { ToolCall, ToolContext } from '../../src/toolkit/types.js';
+import { TOOLKIT_META } from './meta.js';
 
 /** A JSON Response like an upstream API would return. */
 function jsonResponse(body: unknown, status = 200): Response {
@@ -32,6 +33,7 @@ async function runFetchJson(
 ) {
   const server = defineToolkit(
     {
+      ...TOOLKIT_META,
       tools: [
         {
           name: 't',

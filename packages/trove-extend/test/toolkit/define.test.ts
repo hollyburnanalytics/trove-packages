@@ -3,6 +3,7 @@ import { defineToolkit } from '../../src/toolkit/define.js';
 import { ToolError } from '../../src/toolkit/errors.js';
 import { z } from '../../src/toolkit/index.js';
 import type { ToolCall } from '../../src/toolkit/types.js';
+import { TOOLKIT_META } from './meta.js';
 
 /** A minimal call template with no real callbacks exercised. */
 function call(partial: Partial<ToolCall> & { tool: string }): ToolCall {
@@ -18,12 +19,18 @@ function call(partial: Partial<ToolCall> & { tool: string }): ToolCall {
 
 describe('defineToolkit — authoring validation', () => {
   it('rejects an empty tools array', () => {
-    expect(() => defineToolkit({ tools: [] })).toThrow(/non-empty array/);
+    expect(() =>
+      defineToolkit({
+        ...TOOLKIT_META,
+        tools: [],
+      }),
+    ).toThrow(/non-empty array/);
   });
 
   it('rejects an invalid tool name', () => {
     expect(() =>
       defineToolkit({
+        ...TOOLKIT_META,
         tools: [
           {
             name: 'bad name!',
@@ -43,12 +50,18 @@ describe('defineToolkit — authoring validation', () => {
       input: z.object({}),
       handler: async () => ({ text: 'x' }),
     };
-    expect(() => defineToolkit({ tools: [t, { ...t }] })).toThrow(/duplicate tool name/);
+    expect(() =>
+      defineToolkit({
+        ...TOOLKIT_META,
+        tools: [t, { ...t }],
+      }),
+    ).toThrow(/duplicate tool name/);
   });
 
   it('rejects an empty description', () => {
     expect(() =>
       defineToolkit({
+        ...TOOLKIT_META,
         tools: [{ name: 'a', description: '', input: z.object({}), handler: async () => 'x' }],
       }),
     ).toThrow(/non-empty description/);
@@ -57,6 +70,7 @@ describe('defineToolkit — authoring validation', () => {
   it('rejects a missing handler', () => {
     expect(() =>
       defineToolkit({
+        ...TOOLKIT_META,
         tools: [{ name: 'a', description: 'd', input: z.object({}), handler: undefined as any }],
       }),
     ).toThrow(/needs a handler/);
@@ -65,6 +79,7 @@ describe('defineToolkit — authoring validation', () => {
   it('rejects a non-Zod input', () => {
     expect(() =>
       defineToolkit({
+        ...TOOLKIT_META,
         tools: [{ name: 'a', description: 'd', input: {} as any, handler: async () => 'x' }],
       }),
     ).toThrow(/needs a Zod schema/);
@@ -74,6 +89,7 @@ describe('defineToolkit — authoring validation', () => {
 describe('defineToolkit — tools/list compilation', () => {
   it('compiles Zod input to a JSON Schema with descriptions', () => {
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 'lookup_order',
@@ -103,6 +119,7 @@ describe('defineToolkit — tools/list compilation', () => {
 
   it('surfaces a `title` when set, and omits it otherwise', () => {
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 'with_title',
@@ -124,7 +141,9 @@ describe('defineToolkit — annotation defaulting', () => {
     tool: Parameters<typeof defineToolkit>[0]['tools'][number],
     scopes?: string[],
   ) {
-    const server = defineToolkit(scopes ? { tools: [tool], scopes } : { tools: [tool] });
+    const server = defineToolkit(
+      scopes ? { ...TOOLKIT_META, tools: [tool], scopes } : { ...TOOLKIT_META, tools: [tool] },
+    );
     const entry = server.tools[0];
     if (entry === undefined) throw new Error('missing entry');
     return entry.annotations;
@@ -212,6 +231,7 @@ describe('defineToolkit — annotation defaulting', () => {
 describe('defineToolkit — output schema compilation', () => {
   it('compiles a Zod `output` schema to an outputSchema in tools/list', () => {
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 'search',
@@ -234,6 +254,7 @@ describe('defineToolkit — output schema compilation', () => {
 
   it('omits outputSchema when no `output` is declared', () => {
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [{ name: 'x', description: 'd', input: z.object({}), handler: async () => 'ok' }],
     });
     expect(server.tools[0]?.outputSchema).toBeUndefined();
@@ -242,6 +263,7 @@ describe('defineToolkit — output schema compilation', () => {
   it('rejects a non-Zod `output`', () => {
     expect(() =>
       defineToolkit({
+        ...TOOLKIT_META,
         tools: [
           {
             name: 'x',
@@ -259,6 +281,7 @@ describe('defineToolkit — output schema compilation', () => {
 describe('defineToolkit — dispatch & validation', () => {
   it('returns UNKNOWN_TOOL for an unregistered tool', async () => {
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [{ name: 'a', description: 'd', input: z.object({}), handler: async () => 'x' }],
     });
     const r = await server.handle(call({ tool: 'nope' }));
@@ -267,6 +290,7 @@ describe('defineToolkit — dispatch & validation', () => {
 
   it('returns BAD_REQUEST for a malformed call', async () => {
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [{ name: 'a', description: 'd', input: z.object({}), handler: async () => 'x' }],
     });
     const r = await server.handle({} as any);
@@ -276,6 +300,7 @@ describe('defineToolkit — dispatch & validation', () => {
   it('rejects bad arguments BEFORE the handler runs', async () => {
     const handler = vi.fn(async () => ({ text: 'ok' }));
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 'echo',
@@ -294,6 +319,7 @@ describe('defineToolkit — dispatch & validation', () => {
 
   it('passes validated/defaulted args to the handler and wraps a string result', async () => {
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 'echo',
@@ -309,6 +335,7 @@ describe('defineToolkit — dispatch & validation', () => {
 
   it('wraps a structured object result', async () => {
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 't',
@@ -324,6 +351,7 @@ describe('defineToolkit — dispatch & validation', () => {
 
   it('errors when the handler returns an invalid result shape', async () => {
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 't',
@@ -341,6 +369,7 @@ describe('defineToolkit — dispatch & validation', () => {
 describe('defineToolkit — error envelopes', () => {
   it('turns a ToolError into a clean error result with its retryable hint', async () => {
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 't',
@@ -363,6 +392,7 @@ describe('defineToolkit — error envelopes', () => {
 
   it('turns an uncaught throw into a generic error (no stack to model)', async () => {
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 't',
@@ -408,6 +438,7 @@ describe('defineToolkit — default fetch wiring', () => {
     globalThis.fetch = spy as unknown as typeof globalThis.fetch;
 
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 't',
@@ -438,6 +469,7 @@ describe('defineToolkit — declared output schemas are enforced', () => {
   /** A server whose one tool returns whatever `structured` it is handed. */
   const serverReturning = (structured: unknown) =>
     defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 'report',
@@ -479,6 +511,7 @@ describe('defineToolkit — declared output schemas are enforced', () => {
 
   it('surfaces the PARSED value, so declared coercions actually apply', async () => {
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 'counted',
@@ -495,6 +528,7 @@ describe('defineToolkit — declared output schemas are enforced', () => {
 
   it('leaves a tool that declares no output schema alone', async () => {
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 'free',

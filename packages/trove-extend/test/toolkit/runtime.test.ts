@@ -4,6 +4,7 @@ import { ToolError } from '../../src/toolkit/errors.js';
 import { z } from '../../src/toolkit/index.js';
 import { dispatch, listTools, toFetchHandler } from '../../src/toolkit/runtime.js';
 import type { ToolCallResult } from '../../src/toolkit/types.js';
+import { TOOLKIT_META } from './meta.js';
 
 /**
  * A fake callback server: answers /internal/secret and /internal/trove the way
@@ -38,6 +39,7 @@ function fakeCallbackFetch(secrets: Record<string, string>) {
 function buildServer(fetchImpl: ReturnType<typeof fakeCallbackFetch>) {
   return defineToolkit(
     {
+      ...TOOLKIT_META,
       tools: [
         {
           name: 'lookup',
@@ -133,6 +135,7 @@ describe('runtime — toFetchHandler', () => {
 
   it('defaults args to {} when omitted', async () => {
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 'noargs',
@@ -184,6 +187,7 @@ describe('runtime — dispatch & listTools helpers', () => {
 describe('runtime — structuredContent emission', () => {
   it('emits structuredContent alongside the text mirror when output is declared', async () => {
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 'search',
@@ -210,6 +214,7 @@ describe('runtime — structuredContent emission', () => {
 
   it('omits structuredContent when no output schema is declared (back-compat)', async () => {
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 't',
@@ -234,6 +239,7 @@ describe('runtime — structuredContent emission', () => {
 
   it('omits structuredContent when output is declared but handler returns no structured', async () => {
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 't',
@@ -257,6 +263,7 @@ describe('runtime — structuredContent emission', () => {
 
   it('surfaces outputSchema + title + annotations over the GET tools/list wire', async () => {
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 'search',
@@ -290,6 +297,7 @@ describe('runtime — toCall defaults', () => {
   it('defaults missing ctxToken/user/callbackBase/scopes to safe empties', async () => {
     let seenUser = 'unset';
     const server = defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 't',

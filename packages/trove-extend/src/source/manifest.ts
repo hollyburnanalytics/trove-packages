@@ -30,6 +30,7 @@
  * @module
  */
 
+import { checkEgress } from './egress-rules.js';
 import {
   checkConfigBlock,
   checkFanOut,
@@ -223,6 +224,7 @@ export function validateSourceManifest(
   checkTypeFields(manifest, required, implemented, errors);
   checkLocation(manifest, required, errors);
   checkSchedule(manifest, errors);
+  checkEgress(manifest, required, errors);
   checkFanOut(manifest, errors);
   checkFormatting(manifest, errors);
 

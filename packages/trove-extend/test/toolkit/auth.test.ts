@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { defineToolkit } from '../../src/toolkit/define.js';
 import { z } from '../../src/toolkit/index.js';
 import type { ToolCall, ToolContext, ToolkitConfig } from '../../src/toolkit/types.js';
+import { TOOLKIT_META } from './meta.js';
 
 const TOKEN_URL = 'https://api.acme.com/oauth/token';
 const API_URL = 'https://api.acme.com/v1/thing';
@@ -73,6 +74,7 @@ function server(
 ) {
   return defineToolkit(
     {
+      ...TOOLKIT_META,
       auth,
       tools: [
         {
@@ -247,6 +249,7 @@ describe('requireSecret', () => {
     );
     const ok = defineToolkit(
       {
+        ...TOOLKIT_META,
         tools: [
           {
             name: 't',
@@ -262,6 +265,7 @@ describe('requireSecret', () => {
 
     const empty = defineToolkit(
       {
+        ...TOOLKIT_META,
         tools: [
           {
             name: 't',
@@ -283,6 +287,7 @@ describe('defineToolkit auth validation', () => {
   it('throws on an unknown auth type', () => {
     expect(() =>
       defineToolkit({
+        ...TOOLKIT_META,
         auth: { type: 'saml' } as unknown as NonNullable<ToolkitConfig['auth']>,
         tools: [{ name: 't', description: 'd', input: z.object({}), handler: async () => 'x' }],
       }),
@@ -292,6 +297,7 @@ describe('defineToolkit auth validation', () => {
   it('throws when a required auth field is missing', () => {
     expect(() =>
       defineToolkit({
+        ...TOOLKIT_META,
         auth: {
           type: 'oauth2_client_credentials',
           tokenUrl: '',
@@ -307,6 +313,7 @@ describe('defineToolkit auth validation', () => {
   it('throws when auth is set without apiHost', () => {
     expect(() =>
       defineToolkit({
+        ...TOOLKIT_META,
         auth: {
           type: 'oauth2_client_credentials',
           tokenUrl: TOKEN_URL,
@@ -324,6 +331,7 @@ describe('egress guard via ctx.fetch', () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ ok: true }));
     const s = defineToolkit(
       {
+        ...TOOLKIT_META,
         tools: [
           {
             name: 't',
@@ -347,6 +355,7 @@ describe('egress guard via ctx.fetch', () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ ok: true }));
     const s = defineToolkit(
       {
+        ...TOOLKIT_META,
         egress: ['api.allowed.com'],
         tools: [
           {

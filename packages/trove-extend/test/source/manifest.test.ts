@@ -35,6 +35,7 @@ function clean(): Record<string, unknown> {
       username: { label: 'HN Username', type: 'text', placeholder: 'pg' },
     },
     needsBrowser: false,
+    egress: ['news.ycombinator.com'],
   };
 }
 
@@ -463,6 +464,7 @@ describe('the cut a deployed source is held to', () => {
     ingest: 'append',
     runsIn: 'cloud',
     schedule: 'daily',
+    egress: ['api.x.com'],
   };
 
   it('lets a deployed source resume from a high-water id', () => {
@@ -498,5 +500,89 @@ describe('the cut a deployed source is held to', () => {
     );
     expect(result.valid).toBe(false);
     expect(result.errors[0]).toMatch(/is not a known cursor strategy/);
+  });
+});
+
+describe('validateSourceManifest — egress', () => {
+  it('requires the list for a built source, even when the reach is nothing', () => {
+    // Built WITHOUT the key, not with the key set to undefined — the case is a
+    // manifest that never mentions its reach.
+    const { egress: _egress, ...m } = clean();
+    const result = validateSourceManifest(m, { implemented: true });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join('\n')).toMatch(/egress is required/);
+  });
+
+  it('accepts an empty reach when the note says why', () => {
+    const m = clean();
+    m.egress = [];
+    m.egressNote = 'Reads only from the local filesystem.';
+    expect(validateSourceManifest(m, { implemented: true }).valid).toBe(true);
+  });
+
+  it('refuses an empty reach with no explanation', () => {
+    const m = clean();
+    m.egress = [];
+    expect(validateSourceManifest(m, { implemented: true }).errors.join('\n')).toMatch(
+      /egressNote must say why/,
+    );
+  });
+
+  it('refuses anything that is not a bare hostname', () => {
+    for (const bad of [
+      'https://example.com',
+      'example.com/path',
+      'example.com:443',
+      '*.example.com',
+    ]) {
+      const m = clean();
+      m.egress = [bad];
+      expect(validateSourceManifest(m, { implemented: true }).errors.join('\n')).toMatch(
+        /bare lowercase hostname/,
+      );
+    }
+  });
+
+  it('refuses a host declared twice across the two lists', () => {
+    const m = clean();
+    m.egress = ['example.com'];
+    m.egressNotFetched = ['example.com'];
+    m.egressNote = 'Linked but never fetched.';
+    expect(validateSourceManifest(m, { implemented: true }).errors.join('\n')).toMatch(
+      /declared twice/,
+    );
+  });
+
+  it('requires a note when hosts appear but are never fetched', () => {
+    const m = clean();
+    m.egressNotFetched = ['cdn.example.com'];
+    expect(validateSourceManifest(m, { implemented: true }).errors.join('\n')).toMatch(
+      /where those hosts appear/,
+    );
+  });
+
+  it('accepts a config: sentinel that names a real config field', () => {
+    const m = clean();
+    m.egress = ['config:username'];
+    expect(validateSourceManifest(m, { implemented: true }).valid).toBe(true);
+  });
+
+  it('refuses a config: sentinel naming a field that does not exist', () => {
+    const m = clean();
+    m.egress = ['config:nope'];
+    expect(validateSourceManifest(m, { implemented: true }).errors.join('\n')).toMatch(
+      /config block has no 'nope'/,
+    );
+  });
+
+  it('refuses a config: sentinel on a deployed source', () => {
+    // The Outbound Worker's allowlist is host-exact and fixed at deploy time,
+    // so a host only known at run time can never be reached.
+    const m = clean();
+    m.egress = ['config:username'];
+    m.runtime = 'deployed';
+    expect(validateSourceManifest(m, { implemented: true }).errors.join('\n')).toMatch(
+      /fixed at deploy time/,
+    );
   });
 });

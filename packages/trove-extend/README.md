@@ -48,6 +48,25 @@ fetches new content and returns documents — each field maps 1:1 onto the
 import { defineSource } from '@ontrove/extend/source';
 
 export default defineSource({
+  // What the source IS. There is no separate manifest.json to keep in step —
+  // it is generated from this, so the compiler is what notices a mistake.
+  id: 'hacker-news',
+  name: 'Hacker News',
+  description: 'Front-page stories from Hacker News.',
+  icon: '🔶',
+  version: '1.0.0',
+  author: 'you',
+  kind: 'scheduled-sync',
+  transport: 'api',
+  cursor: 'date',
+  ingest: 'append',
+  runsIn: 'cloud',
+  schedule: 'every 6 hours',
+  status: 'implemented',
+  needsBrowser: false,
+  egress: ['hn.algolia.com'],
+
+  // What it DOES.
   async sync(ctx) {
     const res = await ctx.fetch('https://hn.algolia.com/api/v1/search?tags=front_page');
     const { hits } = await res.json();

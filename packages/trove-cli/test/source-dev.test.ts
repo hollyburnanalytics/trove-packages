@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { defineSource, type TroveSource } from '@ontrove/extend/source';
+import type { TroveSource } from '@ontrove/extend/source';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as sourceDev from '../src/commands/source-dev.js';
 import { buildContext, type CommandContext } from '../src/context.js';
@@ -69,7 +69,7 @@ describe('source dev', () => {
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-  const source = defineSource({
+  const source: TroveSource = {
     async sync(ctx) {
       ctx.log('syncing');
       return [
@@ -78,7 +78,7 @@ describe('source dev', () => {
         { id: '2', title: 'Two', text: 'second' },
       ];
     },
-  });
+  };
 
   it('runs sync locally and prints documents as JSON (dedups)', async () => {
     const mock = mockFetch({});
@@ -99,14 +99,14 @@ describe('source dev', () => {
       configEnv: { home: dir, env: { TROVE_TOKEN: 'tok' } },
       isTTY: true,
     });
-    const cur = defineSource({
+    const cur: TroveSource = {
       async sync() {
         return {
           documents: [{ title: 'Fixture', id: 'a', text: 'x' }],
           cursor: { type: 'date', value: 'd' },
         };
       },
-    });
+    };
     await sourceDev.dev(ctx, parseArgs([dir]), loaderFor(cur));
     expect(writer.stdoutText()).toContain('ID');
     expect(writer.stderrText()).toContain('next cursor');
@@ -134,13 +134,13 @@ describe('source dev', () => {
     writeFileSync(configFile, JSON.stringify({ feedUrl: 'https://f' }));
     let seenConfig: Record<string, unknown> = {};
     let seenCursor: unknown;
-    const probe = defineSource({
+    const probe: TroveSource = {
       async sync(ctx) {
         seenConfig = ctx.config as Record<string, unknown>;
         seenCursor = ctx.cursor;
         return [{ title: 'Fixture', id: 'a', text: 'b' }];
       },
-    });
+    };
     const mock = mockFetch({});
     await sourceDev.dev(
       ctxFor(mock, writer, dir),
@@ -275,13 +275,13 @@ describe('source test', () => {
 
   it('asserts document shape against fixtures (pass)', async () => {
     writeFileSync(join(dir, 'fixtures.json'), JSON.stringify({ 'https://feed': '<rss/>' }));
-    const source = defineSource({
+    const source: TroveSource = {
       async sync(ctx) {
         const res = await ctx.fetch('https://feed');
         const body = await res.text();
         return [{ title: 'Fixture', id: '1', text: body }];
       },
-    });
+    };
     const ctx = buildContext({
       globals: { json: true },
       writer,
@@ -299,7 +299,7 @@ describe('source test', () => {
   });
 
   it('reports problems for malformed documents (human, exit 2)', async () => {
-    const source = defineSource({
+    const source: TroveSource = {
       async sync() {
         return {
           documents: [
@@ -311,7 +311,7 @@ describe('source test', () => {
           ],
         };
       },
-    });
+    };
     const ctx = buildContext({
       globals: {},
       writer,
@@ -325,11 +325,11 @@ describe('source test', () => {
   });
 
   it('flags an empty result set', async () => {
-    const source = defineSource({
+    const source: TroveSource = {
       async sync() {
         return [];
       },
-    });
+    };
     const ctx = buildContext({
       globals: { json: true },
       writer,
@@ -344,12 +344,12 @@ describe('source test', () => {
 
   it('passes (human) and stringifies non-string fixture values', async () => {
     writeFileSync(join(dir, 'fixtures.json'), JSON.stringify({ 'https://feed': { hello: 1 } }));
-    const source = defineSource({
+    const source: TroveSource = {
       async sync(ctx) {
         const res = await ctx.fetch('https://feed');
         return [{ title: 'Fixture', id: '1', text: await res.text() }];
       },
-    });
+    };
     const ctx = buildContext({
       globals: {},
       writer,
@@ -368,11 +368,11 @@ describe('source test', () => {
 
   it('rejects a non-object fixtures file', async () => {
     writeFileSync(join(dir, 'fixtures.json'), '[1]');
-    const source = defineSource({
+    const source: TroveSource = {
       async sync() {
         return [{ title: 'Fixture', id: '1', text: 'x' }];
       },
-    });
+    };
     const ctx = buildContext({
       globals: { json: true },
       writer,
@@ -391,11 +391,11 @@ describe('source test', () => {
 
   it('rejects a malformed (unparseable) fixtures file', async () => {
     writeFileSync(join(dir, 'fixtures.json'), '{ broken');
-    const source = defineSource({
+    const source: TroveSource = {
       async sync() {
         return [{ title: 'Fixture', id: '1', text: 'x' }];
       },
-    });
+    };
     const ctx = buildContext({
       globals: { json: true },
       writer,
@@ -414,12 +414,12 @@ describe('source test', () => {
 
   it('serves 404 for an unknown fixture URL', async () => {
     writeFileSync(join(dir, 'fixtures.json'), '{}');
-    const source = defineSource({
+    const source: TroveSource = {
       async sync(ctx) {
         const res = await ctx.fetch('https://unknown');
         return [{ title: 'Fixture', id: '1', text: `status:${String(res.status)}` }];
       },
-    });
+    };
     const ctx = buildContext({
       globals: { json: true },
       writer,
@@ -436,7 +436,7 @@ describe('source test', () => {
   });
 
   it('flags a document with no id', async () => {
-    const source = defineSource({
+    const source: TroveSource = {
       async sync() {
         return {
           documents: [
@@ -448,7 +448,7 @@ describe('source test', () => {
           ],
         };
       },
-    });
+    };
     const ctx = buildContext({
       globals: { json: true },
       writer,
@@ -493,14 +493,14 @@ describe('source sync', () => {
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-  const source = defineSource({
+  const source: TroveSource = {
     async sync() {
       return {
         documents: [{ id: 'd1', title: 'Doc', text: 'body', url: 'https://x' }],
         cursor: { type: 'date', value: '2026-06-14' },
       };
     },
-  });
+  };
 
   it('runs locally then ingests with cursor CAS against an existing source', async () => {
     const mock = mockFetch((req: CapturedRequest) => {
@@ -656,12 +656,12 @@ describe('source sync', () => {
   });
 
   it('--quiet suppresses sync log lines', async () => {
-    const noisy = defineSource({
+    const noisy: TroveSource = {
       async sync(ctx) {
         ctx.log('working');
         return [{ title: 'Fixture', id: 'd1', text: 'b' }];
       },
-    });
+    };
     const mock = mockFetch((req: CapturedRequest) => {
       if (req.operationName === 'CliSources') {
         return { data: { sources: [{ title: 'Fixture', id: 'c_1', name: 'My Blog' }] } };

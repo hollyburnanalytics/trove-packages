@@ -102,7 +102,7 @@ export {
   readDateCursor,
   readIdSet,
 } from './cursor.js';
-export { defineSource, defineSync } from './define.js';
+export { defineSource, defineSync, type SourceExtension, toSourceManifest } from './define.js';
 export {
   CLOUD_ELIGIBLE_TRANSPORTS,
   CURSOR_STRATEGIES,

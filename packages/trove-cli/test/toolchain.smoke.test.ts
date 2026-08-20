@@ -41,6 +41,21 @@ function runCli(
 
 const SOURCE_SRC = `import { defineSource } from '@ontrove/extend/source';
 export default defineSource({
+  id: 'smoke-source',
+  name: 'Smoke Source',
+  description: 'A source used by the real-toolchain smoke suite.',
+  icon: '🧪',
+  version: '1.0.0',
+  author: 'Hollyburn Analytics Inc.',
+  kind: 'scheduled-sync',
+  transport: 'feed',
+  cursor: 'none',
+  ingest: 'append',
+  runsIn: 'cloud',
+  schedule: 'daily',
+  status: 'implemented',
+  needsBrowser: false,
+  egress: ['a.example.com'],
   async sync() {
     return [{ id: 'a', title: 'A', text: 'body', url: 'https://a' }];
   },
@@ -49,6 +64,11 @@ export default defineSource({
 
 const SERVER_SRC = `import { defineToolkit, z } from '@ontrove/extend/toolkit';
 export default defineToolkit({
+  id: 'smoke-toolkit',
+  name: 'Smoke Toolkit',
+  description: 'A toolkit used by the real-toolchain smoke suite.',
+  icon: '🧪',
+  version: '1.0.0',
   tools: [
     {
       name: 'ping',

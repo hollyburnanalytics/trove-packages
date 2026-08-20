@@ -11,7 +11,7 @@
  */
 
 import type { z } from 'zod';
-import type { ExtensionContext } from '../types.js';
+import type { ExtensionContext, ManifestConfigField } from '../types.js';
 import type { ToolError } from './errors.js';
 
 /**
@@ -385,6 +385,27 @@ export interface ToolDefinition<
  * The configuration passed to {@link defineToolkit}.
  */
 export interface ToolkitConfig {
+  /** Stable toolkit id; pattern `^[a-z0-9-]+$`. */
+  id: string;
+  /** Human-readable display name. */
+  name: string;
+  /** What the toolkit is for — shown in the directory and to the model. */
+  description: string;
+  /** A single emoji or an HTTPS URL to a square icon. */
+  icon: string;
+  /** Semver version string. */
+  version: string;
+  /** Who wrote the toolkit. */
+  author?: string;
+  /**
+   * Credential names the toolkit reads through `ctx.secret()`. Names only —
+   * a value here would be a secret in a file everybody can read.
+   */
+  secrets?: ReadonlyArray<string>;
+  /** Whether the toolkit is listed publicly or kept to its owner. */
+  visibility?: 'public' | 'private';
+  /** The preference fields shown in the toolkit's settings. */
+  config?: Record<string, ManifestConfigField>;
   /** The tools this server exposes. At least one is required. */
   tools: ReadonlyArray<ToolDefinition>;
   /**

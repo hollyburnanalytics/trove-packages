@@ -9,8 +9,10 @@ import { ExitCode } from '../src/errors.js';
 import { parseArgs } from '../src/lib/args.js';
 import { present } from './helpers';
 import { type CaptureWriter, captureWriter } from './helpers.js';
+import { TOOLKIT_META } from './toolkit-meta.js';
 
 const server: ToolkitDefinition = defineToolkit({
+  ...TOOLKIT_META,
   tools: [
     {
       name: 'echo',
@@ -104,6 +106,7 @@ describe('mcp dev', () => {
 
   it('renders a write tool as KIND=write and surfaces titles in JSON', async () => {
     const writeServer: ToolkitDefinition = defineToolkit({
+      ...TOOLKIT_META,
       tools: [
         {
           name: 'create_thing',

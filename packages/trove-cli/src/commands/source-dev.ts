@@ -62,40 +62,53 @@ export async function init(ctx: CommandContext, args: ParsedArgs): Promise<numbe
     .toLowerCase()
     .replace(/[^a-z0-9-]+/g, '-')
     .replace(/^-+|-+$/g, '');
-  // Every field here is one the taxonomy actually defines, and the whole object
-  // passes `trove source validate` as written. It did not before: `kind` held a
-  // transport ('feed'), `transport` held a value that is not one ('http'),
-  // `document_semantics` was both the former name and a value from no
-  // vocabulary ('text'), and `watermark` and `location` were absent entirely.
-  // Nothing objected, because the validator did not yet know the vocabulary —
-  // so a new author's first two commands succeeded and their first deploy did
-  // not.
-  const manifest = {
+  // ONE declaration, used twice: it is written into `index.ts` as the argument
+  // to `defineSource`, and emitted as `manifest.json` from that same object.
+  // Two hand-written copies is what this scaffold used to be, and they drifted
+  // — the manifest still said `watermark`, `documentSemantics`, `location` and
+  // `needs_browser` long after those names were retired. Nothing objected,
+  // because `source validate` in authoring mode requires almost none of them:
+  // the author found out at deploy.
+  const declaration = {
     id: id || 'my-source',
     name: basename(name),
-    version: '1.0.0',
     description: `The ${basename(name)} source.`,
+    icon: '📄',
+    version: '1.0.0',
+    author: 'you',
     kind: 'scheduled-sync',
     transport: 'feed',
-    watermark: 'date',
-    documentSemantics: 'append',
-    location: 'cloud',
+    cursor: 'date',
+    ingest: 'append',
+    runsIn: 'cloud',
     schedule: 'every 6 hours',
-    needs_browser: false,
+    status: 'implemented',
+    needsBrowser: false,
+    egress: ['config:feedUrl'],
     config: {
       feedUrl: { label: 'Feed URL', type: 'url', placeholder: 'https://example.com/feed.xml' },
     },
   };
-  writeNew(join(dir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-  writeNew(join(dir, 'index.ts'), SOURCE_STUB);
+  writeNew(
+    join(dir, 'manifest.json'),
+    `${JSON.stringify({ ...declaration, generated: true }, null, 2)}\n`,
+  );
+  writeNew(join(dir, 'index.ts'), sourceStub(declaration));
 
   ctx.writer.err(ctx.style.green(`✓ scaffolded source '${basename(name)}' in ${dir}`));
   ctx.writer.err(ctx.style.dim('Next: edit index.ts, then `trove source dev` to run it.'));
   return Promise.resolve(ExitCode.Success);
 }
 
-/** The scaffolded `index.ts` stub for `source init`. */
-const SOURCE_STUB = `import { defineSource } from '@ontrove/extend/source';
+/**
+ * The scaffolded `index.ts`, built from the same declaration the manifest is.
+ *
+ * @param declaration - The source's manifest fields.
+ * @returns The `index.ts` contents.
+ */
+function sourceStub(declaration: Record<string, unknown>): string {
+  const fields = JSON.stringify(declaration, null, 2).slice(2, -2);
+  return `import { defineSource } from '@ontrove/extend/source';
 
 /**
  * A Trove source: \`sync(ctx)\` fetches new content and returns documents
@@ -103,6 +116,7 @@ const SOURCE_STUB = `import { defineSource } from '@ontrove/extend/source';
  * cloud. See the sources SDK reference.
  */
 export default defineSource({
+${fields},
   async sync(ctx) {
     const feedUrl = ctx.config.feedUrl as string | undefined;
     if (!feedUrl) {
@@ -133,6 +147,7 @@ export default defineSource({
   },
 });
 `;
+}
 
 /**
  * `trove source dev [path]` — run `sync(ctx)` locally (Bun transpile →

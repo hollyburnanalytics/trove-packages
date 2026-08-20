@@ -262,11 +262,97 @@ async function runHandler(
  * @param options - Optional injection points (test fetch).
  * @returns The compiled server definition.
  */
+
+/** A bare lowercase hostname, optionally with a port. Mirrors the source rule. */
+const TOOLKIT_HOST = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+(:\d+)?$/;
+
+/**
+ * Check who the toolkit says it is.
+ *
+ * Eager, and at definition time, for the same reason the source side is: the
+ * manifest is generated from this, so a mistake here is a mistake in a
+ * published artifact. Every toolkit manifest in the catalogs carried an `sdk`
+ * field naming a version of a package nobody read, precisely because nothing
+ * ever checked it.
+ *
+ * @param config - The toolkit configuration.
+ * @param errors - Accumulator for human-readable errors.
+ */
+function checkIdentity(config: ToolkitConfig, errors: string[]): void {
+  if (!/^[a-z0-9-]+$/.test(config.id ?? '')) {
+    errors.push(`id ${JSON.stringify(config.id)} must match /^[a-z0-9-]+$/`);
+  }
+  for (const field of ['name', 'description', 'icon', 'version'] as const) {
+    if (typeof config[field] !== 'string' || config[field].trim() === '') {
+      errors.push(`${field} is required and must be a non-empty string`);
+    }
+  }
+  if (typeof config.version === 'string' && !/^\d+\.\d+\.\d+(-[\w.]+)?$/.test(config.version)) {
+    errors.push(`version ${JSON.stringify(config.version)} is not a semver string`);
+  }
+  if (config.visibility !== undefined && !['public', 'private'].includes(config.visibility)) {
+    errors.push(`visibility ${JSON.stringify(config.visibility)} must be "public" or "private"`);
+  }
+}
+
+/**
+ * Check the lists a toolkit declares: credential NAMES, and reachable hosts.
+ *
+ * @param config - The toolkit configuration.
+ * @param errors - Accumulator for human-readable errors.
+ */
+function checkDeclaredLists(config: ToolkitConfig, errors: string[]): void {
+  for (const name of config.secrets ?? []) {
+    // A NAME, never a value. A secret in a manifest is a secret in a repo, and
+    // the shape of the field is the only thing standing between the two.
+    if (!/^[A-Z][A-Z0-9_]*$/.test(name)) {
+      errors.push(`secrets entry ${JSON.stringify(name)} must be a NAME (UPPER_SNAKE_CASE)`);
+    }
+  }
+  for (const host of config.egress ?? []) {
+    if (!TOOLKIT_HOST.test(host)) {
+      errors.push(`egress entry ${JSON.stringify(host)} is not a bare hostname (optional :port)`);
+    }
+  }
+}
+
+/**
+ * Validate the toolkit's own declaration — the half that becomes its manifest.
+ *
+ * @param config - The toolkit configuration.
+ * @throws {Error} With every problem found, not just the first.
+ */
+function validateToolkitManifest(config: ToolkitConfig): void {
+  const errors: string[] = [];
+  checkIdentity(config, errors);
+  checkDeclaredLists(config, errors);
+  if (errors.length > 0) {
+    throw new Error(
+      `defineToolkit: ${config.id ?? '(no id)'} has an invalid declaration:\n  ${errors.join('\n  ')}`,
+    );
+  }
+}
+
+/**
+ * The manifest half of a toolkit, as the JSON a catalog commits.
+ *
+ * `tools`, `auth` and the handlers are left out: a manifest describes what the
+ * toolkit IS, and the tool list is read from the deployed server itself.
+ *
+ * @param config - The toolkit configuration.
+ * @returns The manifest fields, plus the `generated` marker.
+ */
+export function toToolkitManifest(config: ToolkitConfig): Record<string, unknown> {
+  const { tools: _tools, auth: _auth, ...manifest } = config;
+  return { ...manifest, generated: true };
+}
+
 export function defineToolkit(
   config: ToolkitConfig,
   options: DefineOptions = {},
 ): ToolkitDefinition {
   const serverWrites = (config.scopes ?? []).some((s) => s === INGEST_SCOPE);
+  validateToolkitManifest(config);
   validateAuth(config.auth);
   const { registry, list } = compileTools(config.tools, serverWrites);
   const fetchImpl: FetchLike =

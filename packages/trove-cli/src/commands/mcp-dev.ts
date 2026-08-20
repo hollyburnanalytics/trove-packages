@@ -64,25 +64,41 @@ export async function init(ctx: CommandContext, args: ParsedArgs): Promise<numbe
     .toLowerCase()
     .replace(/[^a-z0-9-]+/g, '-')
     .replace(/^-+|-+$/g, '');
-  const manifest = {
-    id: slug || 'my-server',
+  // ONE declaration, used twice: written into `server.ts` as the argument to
+  // `defineToolkit`, and emitted as `manifest.json` from the same object. The
+  // two used to be written separately, and the manifest half had no `icon` or
+  // `version` at all — fields the directory shows and the deploy records.
+  const declaration = {
+    id: slug || 'my-toolkit',
     name: basename(name),
-    description: `The ${basename(name)} MCP server.`,
+    description: `The ${basename(name)} toolkit.`,
+    icon: '🧰',
+    version: '1.0.0',
     visibility: 'private',
     secrets: [] as string[],
     egress: [] as string[],
     scopes: [] as string[],
   };
-  writeNew(join(dir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-  writeNew(join(dir, 'server.ts'), SERVER_STUB);
+  writeNew(
+    join(dir, 'manifest.json'),
+    `${JSON.stringify({ ...declaration, generated: true }, null, 2)}\n`,
+  );
+  writeNew(join(dir, 'server.ts'), serverStub(declaration));
 
   ctx.writer.err(ctx.style.green(`✓ scaffolded MCP server '${basename(name)}' in ${dir}`));
   ctx.writer.err(ctx.style.dim('Next: edit server.ts, then `trove mcp dev` to serve it locally.'));
   return Promise.resolve(ExitCode.Success);
 }
 
-/** The scaffolded `server.ts` stub for `mcp init`. */
-const SERVER_STUB = `import { defineToolkit, z } from '@ontrove/extend/toolkit';
+/**
+ * The scaffolded `server.ts`, built from the same declaration the manifest is.
+ *
+ * @param declaration - The toolkit's manifest fields.
+ * @returns The `server.ts` contents.
+ */
+function serverStub(declaration: Record<string, unknown>): string {
+  const fields = JSON.stringify(declaration, null, 2).slice(2, -2);
+  return `import { defineToolkit, z } from '@ontrove/extend/toolkit';
 
 /**
  * A hosted Trove MCP server: declare tools with a Zod \`input\` schema and a
@@ -90,6 +106,7 @@ const SERVER_STUB = `import { defineToolkit, z } from '@ontrove/extend/toolkit';
  * ambient authority). See the hosted-MCP SDK reference.
  */
 export default defineToolkit({
+${fields},
   tools: [
     {
       name: 'echo',
@@ -104,6 +121,7 @@ export default defineToolkit({
   ],
 });
 `;
+}
 
 /**
  * `trove mcp dev [path]` — load `server.ts` (Bun), wrap it with the SDK

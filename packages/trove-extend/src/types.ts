@@ -16,6 +16,16 @@
  * @module
  */
 
+import type {
+  CursorStrategy,
+  FormattingPolicy,
+  IngestMode,
+  RunsIn,
+  SourceKind,
+  SourceSchedule,
+  SourceTransport,
+} from './source/taxonomy.js';
+
 /**
  * The default content type Trove assigns a document when it omits `contentType`.
  * Mirrors the GraphQL `ContentType` enum surfaced on `IngestDocumentInput`.
@@ -387,33 +397,57 @@ export interface ManifestConfigField {
  * (sources/manifest reference).
  */
 export interface SourceManifest {
-  /** Stable source-type id; pattern `^[a-z0-9-]+$`. Required. */
+  /** Stable source-type id; pattern `^[a-z0-9-]+$`. */
   id: string;
-  /** Human-readable display name. Required. */
+  /** Human-readable display name. */
   name: string;
   /** One-line directory description. */
-  description?: string;
+  description: string;
   /** A single emoji or an HTTPS URL to a square icon. */
-  icon?: string;
-  /** Semver version string. Required. */
+  icon: string;
+  /** Semver version string. */
   version: string;
   /** Who wrote the source. */
-  author?: string;
-  /** Directory grouping — `reading`, `social`, `finance`, `dev`, `media`, etc. */
-  category?: string;
+  author: string;
+  /** What kind of source this is. Every source built so far is `scheduled-sync`. */
+  kind: SourceKind;
+  /** How the source reaches upstream — `feed`, `api`, `scrape`, `browser`, `local`. */
+  transport: SourceTransport;
+  /** How the source remembers where it stopped — `none`, `date`, `idSet`, `highWaterId`. */
+  cursor: CursorStrategy;
+  /** How documents enter the library. Every source built so far is `append`. */
+  ingest: IngestMode;
+  /** Where the source runs by default — `cloud` or `mac`. */
+  runsIn: RunsIn;
+  /** Human-readable cadence, one of the recognised schedules. */
+  schedule: SourceSchedule;
+  /** Whether the source is built (`implemented`) or still a declaration. */
+  status: string;
+  /** Whether the source requires a Playwright browser. */
+  needsBrowser: boolean;
   /**
-   * Human-readable sync cadence — `"every 6 hours"`, `"daily"`, `"on demand"`, or
-   * `null` for a live-only source. Optional (default: on demand).
+   * The hosts this source may reach. Host-exact, and enforced at run time — a
+   * host absent here is unreachable, not merely undeclared.
    */
-  schedule?: string | null;
+  egress: readonly string[];
+  /** How far back the source can reach, when that is bounded by the upstream. */
+  historyReach?: string;
+  /** `deployed` when the source runs on its own in the hosted runtime. */
+  runtime?: string;
+  /** Why the egress list looks the way it does, when that needs saying. */
+  egressNote?: string;
+  /** Hosts that appear in content but are never fetched. */
+  egressNotFetched?: readonly string[];
   /** The preference fields shown in the setup wizard. Preferences only — no credentials. */
   config?: Record<string, ManifestConfigField>;
-  /** Whether the source requires a Playwright browser. Default `false`. */
-  needs_browser?: boolean;
-  /** What kind of source this is — `feed`, `account`, `files`, `api`. */
-  kind?: string;
-  /** How the source reaches the upstream system — `http`, `browser`, `fs`. */
-  transport?: string;
-  /** Default content type for documents this source produces. */
-  document_semantics?: SourceContentType;
+  /** The per-account/per-feed expansion this source supports. */
+  fanOut?: Record<string, unknown>;
+  /** Whether the source is offered in the marketplace. */
+  available?: boolean;
+  /** Whether the platform reformats this source's text, or leaves it verbatim. */
+  formatting?: FormattingPolicy;
+  /** Credential names the source reads through `ctx.secret()`. */
+  secrets?: readonly string[];
+  /** A declared authorization strategy, for sources that hold one. */
+  auth?: Record<string, unknown>;
 }

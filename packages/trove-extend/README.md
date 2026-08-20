@@ -1,23 +1,29 @@
-# @ontrove/sdk
+# @ontrove/extend
 
-The shared vocabulary for **Trove sources** — scheduled adapters that fetch
-content into your knowledge base. (Source authoring is an early,
-still-developing surface.) You write a `sync(ctx)` that fetches new content and
-returns documents; this package owns the shapes both ends of that call agree on:
-the invoke contract every runtime speaks, the document shape, the typed `ctx`
-capability object, the cursor/cursor model, the local-run harness the CLI
-drives, and manifest validation.
+The standard library for extending **Trove** — a personal knowledge base for AI.
+There are two things you can build, and they share one spine:
 
-What it does **not** yet own are the helpers a source is mostly written against
-— feed parsing, HTML to text, the scrape loop, the code that writes a cursor.
-Those still live alongside the sources themselves, so today the contract is
-shared and the implementation behind it is not. Moving them here is the
-direction of travel.
+| Import | You are building | Entry point |
+|---|---|---|
+| `@ontrove/extend/source` | A **source** — a scheduled adapter that fetches content *into* the knowledge base. | `defineSource({ sync })` |
+| `@ontrove/extend/toolkit` | A **toolkit** — tools an assistant calls live, hosted for you as an MCP server. | `defineToolkit({ tools })` |
 
-It is symmetric with the toolkit-authoring SDK
-([`@ontrove/mcp`](https://www.npmjs.com/package/@ontrove/mcp)) `defineMcpServer`
-contract: a source returns documents to be _stored_ (batch `sync`); a toolkit's
-tools return results to be _read live_.
+A source returns documents to be *stored* (a batch `sync`, resumable via a
+cursor); a toolkit's tools return results to be *read live*. Different
+contracts — but the parts you touch constantly are identical, because both are
+handed the same `ExtensionContext`: a credential, a guarded `fetch`, a log
+line, the clock. Knowing one means knowing the other.
+
+The root import (`@ontrove/extend`) is that shared spine.
+`@ontrove/extend/contract` is the invoke contract every source runtime speaks,
+published so a third runtime can be held to it.
+
+(Source authoring is an early, still-developing surface.) What this package
+does **not** yet own are the helpers a source is mostly written against — feed
+parsing, HTML to text, the scrape loop, the code that writes a cursor. Those
+still live alongside the sources themselves, so today the contract is shared
+and the implementation behind it is not. Moving them here is the direction of
+travel.
 
 See the full [SDK Reference](https://docs.ontrove.sh/sources/sdk-reference/),
 the [manifest.json reference](https://docs.ontrove.sh/sources/manifest/), and
@@ -27,7 +33,7 @@ in the docs.
 ## Install
 
 ```bash
-npm install @ontrove/sdk
+npm install @ontrove/extend
 ```
 
 ## Quickstart
@@ -39,7 +45,7 @@ fetches new content and returns documents — each field maps 1:1 onto the
 ### Hacker News front page
 
 ```ts
-import { defineSource } from '@ontrove/sdk';
+import { defineSource } from '@ontrove/extend/source';
 
 export default defineSource({
   async sync(ctx) {
@@ -70,7 +76,7 @@ export default defineSource({
 > parser. Bring your own (e.g. [`fast-xml-parser`](https://www.npmjs.com/package/fast-xml-parser)).
 
 ```ts no-typecheck
-import { defineSource } from '@ontrove/sdk';
+import { defineSource } from '@ontrove/extend/source';
 // import { parseRss, stripHtml } from './rss-helpers'; // your own — see note above
 
 export default defineSource({
@@ -154,7 +160,7 @@ A `Cursor` describes how a feed resumes between syncs:
 builds a `ctx`, runs `sync`, validates and dedups the documents:
 
 ```ts no-typecheck
-import { runSource } from '@ontrove/sdk';
+import { runSource } from '@ontrove/extend/source';
 import source from './index.js';
 
 const { documents, cursor, duplicatesSkipped } = await runSource(source, {
@@ -171,7 +177,7 @@ keys — the same spirit as the cloud's `validateConfig` (config holds preferenc
 only; credentials live in the macOS Keychain).
 
 ```ts no-typecheck
-import { validateSourceManifest } from '@ontrove/sdk';
+import { validateSourceManifest } from '@ontrove/extend/source';
 
 const { valid, errors } = validateSourceManifest(manifest);
 if (!valid) throw new Error(errors.join('\n'));

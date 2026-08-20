@@ -10,7 +10,7 @@ import { type LoadModuleOptions, loadModule, writeNew } from '../lib/bundle.js';
 import { renderJson, renderTable } from '../output.js';
 
 /**
- * The hosted-MCP dev toolchain, over `@ontrove/mcp`. `init`
+ * The hosted-MCP dev toolchain, over `@ontrove/extend/toolkit`. `init`
  * scaffolds `manifest.json` + `server.ts`; `dev` loads `server.ts` with Bun,
  * wraps it in the SDK's runtime fetch handler, and serves it over
  * `http://127.0.0.1:<port>` so a client can connect; `logs` explains that

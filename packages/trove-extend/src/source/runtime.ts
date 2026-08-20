@@ -9,7 +9,7 @@
  * validates every document's required fields, surfacing problems clearly instead
  * of pushing a malformed payload to the cloud.
  *
- * It is the symmetric sibling of `@ontrove/mcp`'s `dispatch`/`toFetchHandler`: that
+ * It is the symmetric sibling of `@ontrove/extend/toolkit`'s `dispatch`/`toFetchHandler`: that
  * runs a tool call end-to-end without the hosted runtime; this runs a source
  * sync end-to-end without the Mac app sync engine.
  *

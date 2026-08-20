@@ -10,8 +10,8 @@ bun scripts/build-binaries.mjs --all                        # all shipping targe
 ```
 
 `build:bin` first runs `build:vendor` (`scripts/build-mcp-worker-runtime.mjs`),
-which pre-bundles `@ontrove/mcp` for the worker target and embeds it so
-`trove mcp deploy` works from the binary with no on-disk `@ontrove/mcp`. Binaries
+which pre-bundles `@ontrove/extend/toolkit` for the worker target and embeds it
+so `trove mcp deploy` works from the binary with no on-disk `@ontrove/extend`. Binaries
 are Bun-compiled: the runtime and the `@ontrove/*` packages are embedded, so users
 install nothing. `esbuild` is used here only at build time to produce that
 embedded runtime — it is not in the shipped binary.

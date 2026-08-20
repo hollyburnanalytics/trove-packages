@@ -8,7 +8,7 @@
     "",
     "  1. `src/features/hosting/source-shim.mjs` — bundled into every deployed",
     "     source. Runs this file in `test/unit/features/hosting/source-shim.test.ts`.",
-    "  2. `@ontrove/sdk`'s `createSourceWorker` — not written yet. It must run this",
+    "  2. `@ontrove/extend/source`'s `createSourceWorker` — not written yet. It must run this",
     "     file as its own gate before it is published, not merely be read against it.",
     "  3. `trove-macos/Runtime/runner.js` — ships INSIDE AN INSTALLED BINARY with no",
     "     forced update. A contract change that this file does not catch reaches",

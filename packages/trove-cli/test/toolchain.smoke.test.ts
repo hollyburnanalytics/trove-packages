@@ -197,7 +197,7 @@ describe('mcp dev loop via run() (real Bun toolchain)', () => {
   });
 });
 
-describe('mcp deploy bundling (real Bun bundler + embedded @ontrove/mcp)', () => {
+describe('mcp deploy bundling (real Bun bundler + embedded @ontrove/extend/toolkit)', () => {
   let proj: string;
   beforeEach(() => {
     proj = mkdtempSync(join(tmpdir(), 'trove-proj-'));
@@ -208,7 +208,7 @@ describe('mcp deploy bundling (real Bun bundler + embedded @ontrove/mcp)', () =>
     const entry = join(proj, 'server.ts');
     writeFileSync(entry, SERVER_SRC);
     // No injected seams: this drives defaultBundleForDeploy, which runs Bun.build
-    // over a wrapper and resolves @ontrove/mcp from the embedded worker runtime.
+    // over a wrapper and resolves @ontrove/extend/toolkit from the embedded worker runtime.
     const { bundle, tools } = await bundleServer(entry);
     expect(tools).toHaveLength(1);
     expect(tools[0]).toMatchObject({
@@ -300,9 +300,37 @@ describe('source deploy bundling (real Bun bundler + embedded source runtime)', 
     const bundle = await bundleSource(entry);
     expect(bundle.length).toBeGreaterThan(1000);
     expect(bundle).toMatch(/as default/);
-    // Self-contained: neither the shim nor the SDK is left as an import the
-    // sandbox would have to resolve (it cannot — there is no registry there).
-    expect(bundle).not.toMatch(/from\s*['"]@ontrove\/(sdk|source-runtime)['"]/);
+    // Self-contained: NOTHING under `@ontrove/` is left as an import the sandbox
+    // would have to resolve (it cannot — there is no registry there). Matched by
+    // prefix, not by a list of names: the previous version of this assertion
+    // named `sdk`, and so kept passing after the package was renamed.
+    expect(bundle).not.toMatch(/from\s*['"]@ontrove\//);
+  });
+
+  it('refuses an @ontrove specifier the embedded runtime does not supply', async () => {
+    // The failure this guards is silent, not loud. When a specifier is not
+    // matched by the resolver plugin, Bun does not error — it falls through to
+    // on-disk resolution, which SUCCEEDS in this workspace and does not exist in
+    // the compiled binary. So the bundle looks fine here and breaks at a user's
+    // deploy. Refusing unknown `@ontrove/*` up front is what makes that
+    // difference observable.
+    // `@ontrove/extend/toolkit` is the right specifier for the WRONG kind of
+    // extension. It matters that it is a real, installed package: a made-up
+    // specifier would fail on ordinary resolution and prove nothing about this
+    // guard. This one resolves on disk, so without the guard the bundle
+    // succeeds — silently welding the whole toolkit runtime into a source, and
+    // only in a workspace where the package happens to exist.
+    const entry = join(proj, 'index.ts');
+    writeFileSync(entry, `import '@ontrove/extend/toolkit';\n${SOURCE_SRC}`);
+    let thrown: unknown;
+    try {
+      await bundleSource(entry);
+    } catch (error) {
+      thrown = error;
+    }
+    // An absent throw leaves this the empty string, which contains nothing —
+    // so "it did not fail at all" fails the assertion too.
+    expect(thrown instanceof Error ? thrown.message : '').toContain('embedded runtime supplies');
   });
 
   it('serves the invoke contract when the bundled module is executed', async () => {

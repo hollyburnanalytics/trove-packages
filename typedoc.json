@@ -1,7 +1,7 @@
 {
   "$schema": "https://typedoc.org/schema.json",
   "entryPointStrategy": "packages",
-  "entryPoints": ["packages/trove-sdk", "packages/trove-mcp"],
+  "entryPoints": ["packages/trove-extend"],
   "plugin": ["typedoc-plugin-markdown"],
   "out": "api-reference",
   "readme": "none",

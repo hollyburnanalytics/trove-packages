@@ -32,3 +32,16 @@ Renamed with it, for the same reason `mcp` went: `defineMcpServer` →
 
 `zod` stays a PEER dependency of the merged package, as it was of `@ontrove/mcp`
 — a toolkit and its host must not end up with two copies of zod's types.
+
+**The deploy bundlers now refuse an `@ontrove/*` specifier they do not supply**,
+instead of falling through to on-disk resolution. That fall-through is why this
+needed saying: renaming the package updated the wrapper's import text and left
+the resolver matching the retired name, and nothing failed — a workspace has the
+package on disk, and the compiled binary does not. So the bundle looked fine in
+CI and would have broken at deploy. The specifier is now one constant feeding
+both the wrapper and the filter, and a failed bundle reports the bundler's own
+reasons rather than a bare "Bundle failed".
+
+A source may import `@ontrove/extend`, the shared spine — `/source` re-exports
+all of it. A toolkit may not: `/toolkit` does not re-export the guarded-fetch
+helpers, so supplying it there would hand back a module missing `fetchPage`.

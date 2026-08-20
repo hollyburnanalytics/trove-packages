@@ -2,7 +2,7 @@
   "name": "trove-packages",
   "private": true,
   "type": "module",
-  "description": "Monorepo for the publishable Trove authoring packages: @ontrove/sdk, @ontrove/mcp, and @ontrove/cli.",
+  "description": "Monorepo for the publishable Trove authoring packages: @ontrove/extend and @ontrove/cli.",
   "license": "MIT",
   "author": "Hollyburn Analytics Inc.",
   "homepage": "https://ontrove.sh",

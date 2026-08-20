@@ -43,7 +43,7 @@ jobs:
       - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
       - run: bun install --frozen-lockfile
 
-      # dist of sdk+mcp is needed so build:vendor can pre-bundle @ontrove/mcp for
+      # dist of @ontrove/extend is needed so build:vendor can pre-bundle it for
       # the embedded worker runtime; then cross-compile every shipping target.
       - name: Build packages + all binaries
         run: |

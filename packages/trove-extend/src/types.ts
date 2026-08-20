@@ -1,5 +1,5 @@
 /**
- * Public type surface for the `@ontrove/sdk` source authoring library.
+ * Public type surface for the `@ontrove/extend/source` source authoring library.
  *
  * These types describe the source contract (see the sources SDK reference
  * and the cursors guide on the docs site): a source is
@@ -8,7 +8,7 @@
  * `IngestDocumentInput` wire type), the typed `ctx` capability object, the
  * cursor/cursor model, and the local-run harness the CLI drives.
  *
- * It is the symmetric sibling of `@ontrove/mcp` (the toolkit-authoring library —
+ * It is the symmetric sibling of `@ontrove/extend/toolkit` (the toolkit-authoring library —
  * every toolkit runs as a full MCP server on Trove's cloud): a source returns
  * documents to be _stored_ (batch `sync`); a toolkit's tools return results to
  * be _read live_.
@@ -348,7 +348,7 @@ export interface SourceContext<C = Record<string, unknown>> extends ExtensionCon
  *
  * @example
  * ```ts
- * import { defineSource } from '@ontrove/sdk';
+ * import { defineSource } from '@ontrove/extend/source';
  *
  * export default defineSource({
  *   async sync(ctx) {

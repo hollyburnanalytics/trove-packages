@@ -1,12 +1,12 @@
 /**
- * `@ontrove/sdk` — the shared vocabulary for **Trove sources**: scheduled
+ * `@ontrove/extend/source` — the shared vocabulary for **Trove sources**: scheduled
  * adapters that fetch content into a knowledge base. A source exports a
  * `sync(ctx)` that returns documents; this package owns the shapes both ends of
  * that call agree on.
  *
  * ## What it owns today
  *
- * - **The invoke contract** (`@ontrove/sdk/contract`) — the request/response
+ * - **The invoke contract** (`@ontrove/extend/contract`) — the request/response
  *   envelope every runtime speaks. Three of them execute it: Trove's deployed
  *   shim, the CLI's local shim, and the Mac harness. This is the load-bearing
  *   part, and the reason the same `sync(ctx)` runs unchanged in all three.
@@ -33,16 +33,16 @@
  * the pieces every source needs in order to be *correct* rather than merely
  * convenient now live here.
  *
- * It is the symmetric sibling of `@ontrove/mcp`, the toolkit-authoring library
+ * It is the symmetric sibling of `@ontrove/extend/toolkit`, the toolkit-authoring library
  * (every toolkit runs as a full MCP server on Trove's cloud): a source returns
  * documents to be _stored_ (`defineSource` + `sync`); a toolkit's tools return
  * results to be _read live_ (`defineToolkit`). The two are at different
- * stages — a toolkit is written *in* `@ontrove/mcp`, while a source is written
+ * stages — a toolkit is written *in* `@ontrove/extend/toolkit`, while a source is written
  * against a contract this package defines and helpers it does not yet provide.
  *
  * @example
  * ```ts
- * import { defineSource } from '@ontrove/sdk';
+ * import { defineSource } from '@ontrove/extend/source';
  *
  * export default defineSource({
  *   async sync(ctx) {

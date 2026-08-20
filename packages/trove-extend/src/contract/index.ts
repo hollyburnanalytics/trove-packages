@@ -24,7 +24,7 @@
  * against the alternative of copies kept in step by a checker that can only run
  * where both copies happen to be present.
  *
- * The raw JSON is exported too, at `@ontrove/sdk/contract/source-invoke.json`,
+ * The raw JSON is exported too, at `@ontrove/extend/contract/source-invoke.json`,
  * because the Mac's runner is plain JavaScript with no TypeScript build.
  *
  * @module

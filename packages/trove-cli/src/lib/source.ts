@@ -2,7 +2,7 @@ import type { Cursor, Document } from '@ontrove/extend/source';
 
 /**
  * Shared helpers for the source dev loop (`source dev/test/sync`): mapping
- * `@ontrove/sdk`'s `Document` onto the GraphQL `IngestDocumentInput`, and
+ * `@ontrove/extend/source`'s `Document` onto the GraphQL `IngestDocumentInput`, and
  * (de)serializing the typed {@link Cursor} to/from the opaque
  * `Feed.cursor`/`ingestDocuments(cursor)` string.
  *

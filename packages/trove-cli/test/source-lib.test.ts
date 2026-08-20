@@ -41,7 +41,7 @@ describe('serializeCursor', () => {
       JSON.stringify({ type: 'date', value: '2026-01-01' }),
     );
     // `max` is the numeric cap on retained ids, not an id — see the Cursor
-    // wire contract in @ontrove/sdk.
+    // wire contract in @ontrove/extend/source.
     const idSet: Cursor = { type: 'idSet', values: ['1', '2'], max: 2 };
     expect(serializeCursor(idSet)).toBe(JSON.stringify(idSet));
   });

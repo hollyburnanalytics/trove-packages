@@ -29,7 +29,7 @@ import {
 
 /**
  * The source dev toolchain: `source init/dev/test/validate/sync/deploy`, all
- * over `@ontrove/sdk`. `init` scaffolds a project; `dev`/`test` run the
+ * over `@ontrove/extend/source`. `init` scaffolds a project; `dev`/`test` run the
  * source's `sync(ctx)` locally (transpiled and run by Bun) and inspect the
  * output; `validate` lints the manifest; `sync` runs locally then pushes via
  * `mutation ingestDocuments` with cursor compare-and-swap.
@@ -136,7 +136,7 @@ export default defineSource({
 
 /**
  * `trove source dev [path]` — run `sync(ctx)` locally (Bun transpile →
- * `@ontrove/sdk` `runSource`) and print the produced documents. No upload.
+ * `@ontrove/extend/source` `runSource`) and print the produced documents. No upload.
  *
  * @param ctx - The command context.
  * @param args - Parsed positionals (`[path]`) + `--config`/`--cursor`.
@@ -246,7 +246,7 @@ export async function test(
 
 /**
  * `trove source validate [path]` — validate `manifest.json` via
- * `@ontrove/sdk`'s `validateSourceManifest` (shape + credential-key lint). No
+ * `@ontrove/extend/source`'s `validateSourceManifest` (shape + credential-key lint). No
  * GraphQL.
  *
  * @param ctx - The command context.

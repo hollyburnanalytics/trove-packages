@@ -1,7 +1,7 @@
 /**
  * `defineSource` — the single entry point for authoring a Trove source
  * (sources/sdk-reference). It is the symmetric sibling of `defineToolkit`
- * in `@ontrove/mcp`.
+ * in `@ontrove/extend/toolkit`.
  *
  * It is an identity function with light, eager validation: it confirms the value
  * is a source object with a `sync` method, so a typo (`snyc`, a missing

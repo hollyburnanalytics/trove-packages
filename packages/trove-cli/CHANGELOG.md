@@ -1,5 +1,12 @@
 # @ontrove/cli
 
+## 3.1.0
+
+### Patch Changes
+
+- Updated dependencies [0b18d4c]
+  - @ontrove/extend@3.1.0
+
 ## 3.0.0
 
 ### Major Changes

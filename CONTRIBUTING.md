@@ -28,8 +28,8 @@ To iterate on one package, `cd packages/<name>` and use its own
 
 ## Notes
 
-- `@ontrove/cli` depends on `@ontrove/sdk` and `@ontrove/mcp`; the workspace links
-  them locally, but their manifests carry real published semver ranges.
+- `@ontrove/cli` depends on `@ontrove/extend`; the workspace links it locally,
+  but the manifest carries a real published semver range.
 - Public API changes need a `minor` (additive) or `major` (breaking) changeset.
 
 By contributing, you agree your contributions are licensed under the project's

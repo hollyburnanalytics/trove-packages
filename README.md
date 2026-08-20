@@ -4,14 +4,12 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 The developer toolchain for [Trove](https://ontrove.sh) — a personal knowledge
-base for AI. This monorepo holds the three published `@ontrove/*` packages used
-to author sources, build your own toolkits as MCP servers, and talk to your
-knowledge base.
+base for AI. This monorepo holds the published `@ontrove/*` packages used to
+author sources and toolkits, and to talk to your knowledge base.
 
 | Package | What it's for | Install |
 |---------|---------------|-----|
-| [`@ontrove/sdk`](packages/trove-sdk) | Author **sources** — `defineSource`, the `sync(ctx)` capability object, the document shape, a local-run harness, and manifest validation. | `npm i @ontrove/sdk` |
-| [`@ontrove/mcp`](packages/trove-mcp) | Author **toolkits** — `defineMcpServer`, the `ctx` capability object, Zod schemas, and `ToolError`. | `npm i @ontrove/mcp` |
+| [`@ontrove/extend`](packages/trove-extend) | Author **sources** (`@ontrove/extend/source` — `defineSource`, cursors, the document shape, a local-run harness, manifest validation) and **toolkits** (`@ontrove/extend/toolkit` — `defineToolkit`, `tool`, `ToolError`, Zod schemas), over one shared capability object. | `npm i @ontrove/extend` |
 | [`@ontrove/cli`](packages/trove-cli) | The `trove` command-line tool — a scriptable GraphQL client for your knowledge base and the toolchain for authoring sources and building & deploying toolkits. | `brew install hollyburnanalytics/tap/trove` · [other channels](packages/trove-cli#install) |
 
 > Looking for working examples? See **[the examples gallery](https://github.com/hollyburnanalytics/trove-integrations)** —
@@ -21,9 +19,8 @@ knowledge base.
 
 ```
 packages/
-  trove-sdk/    → @ontrove/sdk
-  trove-mcp/    → @ontrove/mcp
-  trove-cli/    → @ontrove/cli   (depends on the two SDKs)
+  trove-extend/ → @ontrove/extend
+  trove-cli/    → @ontrove/cli   (depends on @ontrove/extend)
 ```
 
 ## Development
@@ -32,7 +29,7 @@ Requires [Bun](https://bun.sh) ≥ 1.2 and Node ≥ 20.
 
 ```bash
 bun install        # install + link the workspace
-bun run build      # build all packages (SDKs first, then the CLI)
+bun run build      # build all packages (extend first, then the CLI)
 bun run test       # run every package's tests
 bun run lint       # Biome across all packages
 bun run check      # lint + typecheck + test + build

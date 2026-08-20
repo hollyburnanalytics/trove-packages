@@ -18,8 +18,8 @@ import {
 } from './helpers.js';
 
 /** A minimal valid `server.ts` for exercising the real deploy bundler. */
-const DEPLOY_SERVER_TS = `import { defineMcpServer, z } from '@ontrove/mcp';
-export default defineMcpServer({ tools: [{ name: 'search', description: 'S', input: z.object({}), async handler() { return { text: 'ok' }; } }] });
+const DEPLOY_SERVER_TS = `import { defineToolkit, z } from '@ontrove/extend/toolkit';
+export default defineToolkit({ tools: [{ name: 'search', description: 'S', input: z.object({}), async handler() { return { text: 'ok' }; } }] });
 `;
 
 /** Run with a token, forcing human output (TTY) unless overridden. */
@@ -163,8 +163,8 @@ describe('mcp + secret human/lifecycle coverage', () => {
     writeFileSync(join(home.home, 'manifest.json'), JSON.stringify({ name: 'S', slug: 'my' }));
     writeFileSync(
       join(home.home, 'server.ts'),
-      "import { defineMcpServer, z } from '@ontrove/mcp';\n" +
-        'export default defineMcpServer({ tools: [{ name: "search", description: "S", input: z.object({}), async handler() { return { text: "ok" }; } }] });\n',
+      "import { defineToolkit, z } from '@ontrove/extend/toolkit';\n" +
+        'export default defineToolkit({ tools: [{ name: "search", description: "S", input: z.object({}), async handler() { return { text: "ok" }; } }] });\n',
     );
     const mock = mockFetch({
       data: {

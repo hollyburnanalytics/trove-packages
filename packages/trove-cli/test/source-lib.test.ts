@@ -1,4 +1,4 @@
-import type { Cursor, Document } from '@ontrove/sdk';
+import type { Cursor, Document } from '@ontrove/extend/source';
 import { describe, expect, it } from 'vitest';
 import { parseCursor, serializeCursor, toIngestInput } from '../src/lib/source.js';
 
@@ -41,7 +41,7 @@ describe('serializeCursor', () => {
       JSON.stringify({ type: 'date', value: '2026-01-01' }),
     );
     // `max` is the numeric cap on retained ids, not an id — see the Cursor
-    // wire contract in @ontrove/sdk.
+    // wire contract in @ontrove/extend/source.
     const idSet: Cursor = { type: 'idSet', values: ['1', '2'], max: 2 };
     expect(serializeCursor(idSet)).toBe(JSON.stringify(idSet));
   });

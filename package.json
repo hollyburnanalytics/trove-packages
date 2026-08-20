@@ -2,7 +2,7 @@
   "name": "trove-packages",
   "private": true,
   "type": "module",
-  "description": "Monorepo for the publishable Trove authoring packages: @ontrove/sdk, @ontrove/mcp, and @ontrove/cli.",
+  "description": "Monorepo for the publishable Trove authoring packages: @ontrove/extend and @ontrove/cli.",
   "license": "MIT",
   "author": "Hollyburn Analytics Inc.",
   "homepage": "https://ontrove.sh",
@@ -15,7 +15,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "bun run --filter './packages/trove-sdk' --filter './packages/trove-mcp' build && bun run --filter './packages/trove-cli' build",
+    "build": "bun run --filter './packages/trove-extend' build && bun run --filter './packages/trove-cli' build",
     "test": "bun run --filter '*' test",
     "test:coverage": "bun run --filter '*' test:coverage",
     "lint": "bun run --filter '*' lint",

@@ -32,7 +32,7 @@ const OUT = process.argv[2] || join(ROOT, 'dist', 'bin', 'THIRD-PARTY-LICENSES.t
 // rather than a flat tree. Search the direct-dep symlinks first, then that store.
 const NM_BASES = [
   join(ROOT, 'packages', 'trove-cli', 'node_modules'),
-  join(ROOT, 'packages', 'trove-mcp', 'node_modules'),
+  join(ROOT, 'packages', 'trove-extend', 'node_modules'),
   join(ROOT, 'node_modules'),
 ];
 const BUN_STORE = join(ROOT, 'node_modules', '.bun');

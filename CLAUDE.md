@@ -2,8 +2,7 @@
 
 Public (MIT), npm-published monorepo for Trove's authoring packages:
 
-- **`@ontrove/sdk`** (`packages/trove-sdk`) — the source SDK (`sync(ctx)`).
-- **`@ontrove/mcp`** (`packages/trove-mcp`) — the toolkit SDK (`defineMcpServer`; every toolkit runs as a hosted MCP server).
+- **`@ontrove/extend`** (`packages/trove-extend`) — the authoring library. `@ontrove/extend/source` (`defineSource`, `sync(ctx)`), `@ontrove/extend/toolkit` (`defineToolkit`; every toolkit runs as a hosted MCP server), `@ontrove/extend/contract` (the invoke contract), and the shared `ExtensionContext` spine at the root.
 - **`@ontrove/cli`** (`packages/trove-cli`) — the `trove` CLI (GraphQL client + authoring toolchain).
 
 These packages are the **public** authoring surface for Trove. They document
@@ -14,8 +13,8 @@ non-public product internals or hosting implementation.
 
 ```bash
 bun install
-bun run check        # build → lint → knip → typecheck → test (build first: cli needs the sdk/mcp dist)
-bun run build        # build sdk + mcp, then cli
+bun run check        # build → lint → knip → typecheck → test (build first: cli needs the extend dist)
+bun run build        # build extend, then cli
 bun run lint         # Biome
 bun run lint:knip    # knip: unused exports/types/files/duplicates
 bun run lint:baseline # ratchet: warn-level lint debt + suppressions may only shrink

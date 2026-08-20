@@ -2,8 +2,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import * as ontroveMcp from '@ontrove/mcp';
-import * as ontroveSdk from '@ontrove/sdk';
+import * as ontroveSdk from '@ontrove/extend/source';
+import * as ontroveMcp from '@ontrove/extend/toolkit';
 import { usageError } from '../errors.js';
 
 /**
@@ -11,8 +11,8 @@ import { usageError } from '../errors.js';
  * is TypeScript, so the CLI transpiles and runs it in-process. The `trove` CLI
  * ships as a single Bun binary (`bun build --compile`) with a Node-compatible
  * runtime and a TypeScript loader embedded, so this uses Bun natively — no
- * separate bundler and no toolchain for the user to install. The `@ontrove/sdk`
- * and `@ontrove/mcp` packages are embedded in the binary and supplied to the
+ * separate bundler and no toolchain for the user to install. The `@ontrove/extend/source`
+ * and `@ontrove/extend/toolkit` packages are embedded in the binary and supplied to the
  * user's code by a runtime resolver, so an `index.ts`/`server.ts` in any
  * directory runs even with no `node_modules` of its own. The *result* never
  * crosses the boundary (that is `ingestDocuments`/`deployServer`'s job).
@@ -49,16 +49,55 @@ export interface LoadModuleOptions {
   bundleImpl?: (entry: string) => Promise<string>;
 }
 
+/**
+ * The bare specifiers the deploy bundlers answer from the embedded runtime.
+ *
+ * Declared once and used BOTH to write the wrapper module and to build the
+ * resolver filter, because holding the same specifier in two places is how this
+ * broke: the rename to `@ontrove/extend` updated the wrapper's import text and
+ * left the `onResolve` regex matching the retired name. Nothing failed — the
+ * bundler quietly fell through to on-disk resolution, which exists in a
+ * workspace and does not exist in the compiled binary.
+ */
+const TOOLKIT_SPECIFIER = '@ontrove/extend/toolkit';
+/** The source-authoring specifier an author writes in `index.ts`. */
+const SOURCE_SPECIFIER = '@ontrove/extend/source';
+/**
+ * A VIRTUAL specifier — no such package is published. The source deploy wrapper
+ * imports it to reach the pre-bundled shim, which re-exports the whole source
+ * library so {@link SOURCE_SPECIFIER} resolves to the SAME module.
+ */
+const SOURCE_RUNTIME_SPECIFIER = '@ontrove/source-runtime';
+/**
+ * The shared spine. Supplied to a SOURCE deploy — `@ontrove/extend/source`
+ * re-exports every root export, so the embedded shim already contains them.
+ * NOT supplied to a toolkit deploy: `@ontrove/extend/toolkit` does not re-export
+ * the guarded-fetch helpers, so answering it there would hand back a module
+ * missing `fetchPage` and fail as `undefined` at the first call instead of here.
+ */
+const ROOT_SPECIFIER = '@ontrove/extend';
+
+/**
+ * An exact-match filter over bare specifiers, with regex metacharacters escaped.
+ *
+ * @param specifiers - Specifiers to match exactly.
+ * @returns A regex matching any one of them and nothing else.
+ */
+function exactly(...specifiers: string[]): RegExp {
+  const alternatives = specifiers.map((s) => s.replaceAll(/[$()*+.?[\\\]^{|}]/g, '\\$&')).join('|');
+  return new RegExp(`^(?:${alternatives})$`);
+}
+
 /** Whether the embedded `@ontrove/*` resolver has been registered. */
 let embeddedResolverRegistered = false;
 
 /* v8 ignore start -- Bun-only; verified by the Bun smoke test, not the Node-instrumented unit suite. */
 
 /**
- * Register a Bun runtime resolver that maps bare `@ontrove/sdk`/`@ontrove/mcp`
+ * Register a Bun runtime resolver that maps bare `@ontrove/extend/source`/`@ontrove/extend/toolkit`
  * imports to the copies embedded in the binary. This is what lets a user's
  * `index.ts`/`server.ts` — living in a directory with no `node_modules` — run
- * inside the compiled CLI: their `import { defineSource } from '@ontrove/sdk'`
+ * inside the compiled CLI: their `import { defineSource } from '@ontrove/extend/source'`
  * resolves to the exact version the CLI ships, with no install and no drift.
  */
 function registerEmbeddedResolver(): void {
@@ -66,8 +105,8 @@ function registerEmbeddedResolver(): void {
   Bun.plugin({
     name: 'ontrove-embedded',
     setup(build: { module: (specifier: string, cb: () => unknown) => void }): void {
-      build.module('@ontrove/sdk', () => ({ exports: ontroveSdk, loader: 'object' }));
-      build.module('@ontrove/mcp', () => ({ exports: ontroveMcp, loader: 'object' }));
+      build.module('@ontrove/extend/source', () => ({ exports: ontroveSdk, loader: 'object' }));
+      build.module('@ontrove/extend/toolkit', () => ({ exports: ontroveMcp, loader: 'object' }));
     },
   });
   embeddedResolverRegistered = true;
@@ -85,9 +124,69 @@ async function defaultLoad(entry: string): Promise<ModuleNamespace> {
 }
 
 /**
+ * Flatten whatever `Bun.build` threw into a reason a user can act on.
+ *
+ * `Bun.build` rejects with an `AggregateError` whose own message is the useless
+ * `"Bundle failed"`; the real reasons — the unresolved specifier, the syntax
+ * error, the missing export — are in `.errors`. Reporting only the outer message
+ * tells someone their deploy failed and nothing about why.
+ *
+ * @param error - The value `Bun.build` threw.
+ * @returns The collected reasons, newline-separated, or the plain message.
+ */
+function bundleFailureReason(error: unknown): string {
+  const errors = (error as { errors?: unknown }).errors;
+  if (Array.isArray(errors) && errors.length > 0) {
+    return errors.map((e) => String((e as { message?: unknown }).message ?? e)).join('\n');
+  }
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * `Bun.build`, but a failure says why.
+ *
+ * @param entry - The user's entry file, for the message.
+ * @param config - The build configuration to run.
+ * @returns The build result.
+ * @throws {@link CliError} (usage) carrying the underlying bundler reasons.
+ */
+async function buildOrExplain(
+  entry: string,
+  config: Parameters<typeof Bun.build>[0],
+): Promise<Awaited<ReturnType<typeof Bun.build>>> {
+  try {
+    return await Bun.build(config);
+  } catch (error) {
+    throw usageError(`Failed to bundle ${entry} for deployment:\n${bundleFailureReason(error)}`);
+  }
+}
+
+/**
+ * Reject any `@ontrove/*` specifier the embedded resolver does not answer.
+ *
+ * Registered AFTER the specific handlers, so it only sees what they declined.
+ * Without it an unhandled specifier is not an error: the bundler falls through
+ * to on-disk resolution, which succeeds in a workspace and fails in the
+ * compiled binary — so the break surfaces at a user's deploy rather than in
+ * CI. It also silently admits a SECOND copy of the library, which would make
+ * `defineSource` a different function from the one `runSource` expects.
+ *
+ * @param build - The Bun build plugin builder to register on.
+ * @param handled - The specifiers the plugin does answer, for the message.
+ */
+function rejectUnhandledOntroveSpecifiers(build: BunBuildPluginBuilder, handled: string[]): void {
+  build.onResolve({ filter: /^@ontrove\// }, (args: { path: string }) => {
+    throw new Error(
+      `Cannot bundle ${args.path} for deployment: the embedded runtime supplies ` +
+        `${handled.join(' and ')}, and nothing else. Import one of those instead.`,
+    );
+  });
+}
+
+/**
  * The default deploy bundler: build the server + `toFetchHandler` wrapper into a
  * single ESM module for the hosted runtime (worker conditions). The compiled
- * binary has no on-disk `@ontrove/mcp` to bundle, so the MCP runtime is embedded
+ * binary has no on-disk `@ontrove/extend/toolkit` to bundle, so the MCP runtime is embedded
  * (pre-bundled for the worker target by `scripts/build-mcp-worker-runtime.mjs`)
  * and supplied to `Bun.build` via a resolver plugin.
  */
@@ -100,11 +199,11 @@ async function defaultBundleForDeploy(entry: string): Promise<string> {
   writeFileSync(
     wrapper,
     `import server from ${JSON.stringify(resolve(entry))};\n` +
-      `import { toFetchHandler } from '@ontrove/mcp';\n` +
+      `import { toFetchHandler } from ${JSON.stringify(TOOLKIT_SPECIFIER)};\n` +
       `export default toFetchHandler(server);\n`,
   );
   try {
-    const result = await Bun.build({
+    const result = await buildOrExplain(entry, {
       entrypoints: [wrapper],
       target: 'browser',
       conditions: ['workerd', 'worker', 'browser'],
@@ -112,14 +211,15 @@ async function defaultBundleForDeploy(entry: string): Promise<string> {
         {
           name: 'ontrove-mcp-embedded',
           setup(build: BunBuildPluginBuilder): void {
-            build.onResolve({ filter: /^@ontrove\/mcp$/ }, () => ({
-              path: '@ontrove/mcp',
+            build.onResolve({ filter: exactly(TOOLKIT_SPECIFIER) }, () => ({
+              path: TOOLKIT_SPECIFIER,
               namespace: 'ontrove-mcp',
             }));
             build.onLoad({ filter: /.*/, namespace: 'ontrove-mcp' }, () => ({
               contents: mcpRuntime,
               loader: 'js',
             }));
+            rejectUnhandledOntroveSpecifiers(build, [TOOLKIT_SPECIFIER]);
           },
         },
       ],
@@ -143,7 +243,7 @@ async function defaultBundleForDeploy(entry: string): Promise<string> {
  * `@ontrove/source-runtime` is a VIRTUAL specifier — no such package exists.
  * The plugin below answers it with the pre-bundled shim
  * (`scripts/build-source-worker-runtime.mjs`), because the compiled binary has
- * no on-disk `@ontrove/sdk` to bundle. The author's own `@ontrove/sdk` import
+ * no on-disk `@ontrove/extend/source` to bundle. The author's own `@ontrove/extend/source` import
  * resolves to the SAME module, which is why the shim re-exports the SDK: two
  * copies would mean `defineSource` was not the function `runSource` expects.
  */
@@ -161,11 +261,11 @@ async function defaultBundleSourceForDeploy(entry: string): Promise<string> {
     // on its first invoke rather than fail here. `createSourceWorker` normalises
     // a bare function to `{ sync }` itself.
     `import * as source from ${JSON.stringify(resolve(entry))};\n` +
-      `import { createSourceWorker } from '@ontrove/source-runtime';\n` +
+      `import { createSourceWorker } from ${JSON.stringify(SOURCE_RUNTIME_SPECIFIER)};\n` +
       `export default createSourceWorker(source.default ?? source.sync);\n`,
   );
   try {
-    const result = await Bun.build({
+    const result = await buildOrExplain(entry, {
       entrypoints: [wrapper],
       target: 'browser',
       conditions: ['workerd', 'worker', 'browser'],
@@ -173,14 +273,15 @@ async function defaultBundleSourceForDeploy(entry: string): Promise<string> {
         {
           name: 'ontrove-source-runtime-embedded',
           setup(build: BunBuildPluginBuilder): void {
-            build.onResolve({ filter: /^@ontrove\/(source-runtime|sdk)$/ }, () => ({
-              path: '@ontrove/source-runtime',
-              namespace: 'ontrove-source-runtime',
-            }));
+            build.onResolve(
+              { filter: exactly(SOURCE_RUNTIME_SPECIFIER, SOURCE_SPECIFIER, ROOT_SPECIFIER) },
+              () => ({ path: SOURCE_RUNTIME_SPECIFIER, namespace: 'ontrove-source-runtime' }),
+            );
             build.onLoad({ filter: /.*/, namespace: 'ontrove-source-runtime' }, () => ({
               contents: sourceRuntime,
               loader: 'js',
             }));
+            rejectUnhandledOntroveSpecifiers(build, [SOURCE_SPECIFIER, ROOT_SPECIFIER]);
           },
         },
       ],
@@ -201,7 +302,7 @@ async function defaultBundleSourceForDeploy(entry: string): Promise<string> {
  * Transpile a single TypeScript entry file and dynamically import the result,
  * returning the module's `default` export.
  *
- * The `@ontrove/sdk`/`@ontrove/mcp` packages are supplied to the user's code from
+ * The `@ontrove/extend/source`/`@ontrove/extend/toolkit` packages are supplied to the user's code from
  * the CLI itself (embedded, via {@link registerEmbeddedResolver}), so the
  * `index.ts`/`server.ts` runs even though its project directory has no
  * `node_modules`. The CLI then drives the loaded value structurally
@@ -287,7 +388,12 @@ export interface ServerBundle {
 
 /** Minimal shape of the `Bun.build` plugin builder we use. */
 interface BunBuildPluginBuilder {
-  onResolve(filter: { filter: RegExp }, cb: () => { path: string; namespace: string }): void;
+  onResolve(
+    filter: { filter: RegExp },
+    // The callback receives the specifier being resolved. Handlers that answer a
+    // fixed specifier ignore it; the catch-all needs it to name what it refused.
+    cb: (args: { path: string }) => { path: string; namespace: string },
+  ): void;
   onLoad(
     filter: { filter: RegExp; namespace: string },
     cb: () => { contents: string; loader: string },
@@ -347,7 +453,7 @@ export async function bundleServer(
     tools?: ReadonlyArray<Record<string, unknown>>;
   }>(entry, options);
   if (!server || !Array.isArray(server.tools)) {
-    throw usageError(`${entry} default export is not a server (expected defineMcpServer(...)).`);
+    throw usageError(`${entry} default export is not a server (expected defineToolkit(...)).`);
   }
   const tools = server.tools
     .map((t) => toBundledTool(t))

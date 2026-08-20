@@ -69,15 +69,24 @@ if (blocks.length === 0) {
   process.exit(0);
 }
 
-// Map each `@ontrove/*` import straight to the package's built `dist/index.d.ts`
-// (the published type surface), so the check is independent of node_modules
-// layout and only ever sees what consumers get.
+// Map each `@ontrove/*` import straight to the built `.d.ts` its `exports` entry
+// points at — every subpath, not just the root — so the check is independent of
+// node_modules layout and only ever sees what consumers get. Reading the exports
+// map rather than assuming one root entry is what makes a subpath-shaped package
+// (`@ontrove/extend/source`) checkable at all; the earlier version silently had
+// no mapping for those and failed with "cannot find module".
 const paths = {};
 for (const rel of readmes()) {
   const dir = rel.replace(/\/README\.md$/, '');
-  const name = JSON.parse(readFileSync(join(ROOT, dir, 'package.json'), 'utf8')).name;
-  // Relative to the tsconfig location (TMP), which is one level under ROOT.
-  paths[name] = [`../${dir}/dist/index.d.ts`];
+  const pkg = JSON.parse(readFileSync(join(ROOT, dir, 'package.json'), 'utf8'));
+  const entries = Object.entries(pkg.exports ?? { '.': { types: './dist/index.d.ts' } });
+  for (const [subpath, target] of entries) {
+    const types = typeof target === 'string' ? target : target?.types;
+    if (types === undefined) continue;
+    const specifier = subpath === '.' ? pkg.name : `${pkg.name}/${subpath.replace(/^\.\//, '')}`;
+    // Relative to the tsconfig location (TMP), which is one level under ROOT.
+    paths[specifier] = [`../${dir}/${types.replace(/^\.\//, '')}`];
+  }
 }
 
 // Write each example as its own module, plus a tsconfig that resolves the imports.

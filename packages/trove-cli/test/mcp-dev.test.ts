@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { defineMcpServer, type McpServerDefinition, z } from '@ontrove/mcp';
+import { defineToolkit, type ToolkitDefinition, z } from '@ontrove/extend/toolkit';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as mcpDev from '../src/commands/mcp-dev.js';
 import { buildContext } from '../src/context.js';
@@ -10,7 +10,7 @@ import { parseArgs } from '../src/lib/args.js';
 import { present } from './helpers';
 import { type CaptureWriter, captureWriter } from './helpers.js';
 
-const server: McpServerDefinition = defineMcpServer({
+const server: ToolkitDefinition = defineToolkit({
   tools: [
     {
       name: 'echo',
@@ -103,7 +103,7 @@ describe('mcp dev', () => {
   });
 
   it('renders a write tool as KIND=write and surfaces titles in JSON', async () => {
-    const writeServer: McpServerDefinition = defineMcpServer({
+    const writeServer: ToolkitDefinition = defineToolkit({
       tools: [
         {
           name: 'create_thing',
@@ -157,7 +157,7 @@ describe('mcp dev', () => {
   });
 
   it('the served handler answers tools/list and a tool call', async () => {
-    let captured: import('@ontrove/mcp').FetchHandler | undefined;
+    let captured: import('@ontrove/extend/toolkit').FetchHandler | undefined;
     const ctx = buildContext({
       globals: { json: true },
       writer,
@@ -202,7 +202,7 @@ describe('mcp dev — live serve seam', () => {
   it('defaultServe answers a real GET (tools/list) and POST (tool call)', async () => {
     // requires live loopback: exercises the real 127.0.0.1 bridge.
     const local = await mcpDev.defaultServe(
-      (await import('@ontrove/mcp')).toFetchHandler(server),
+      (await import('@ontrove/extend/toolkit')).toFetchHandler(server),
       0,
     );
     try {

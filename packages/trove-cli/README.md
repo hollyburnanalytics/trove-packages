@@ -66,8 +66,8 @@ trove save --url https://example.com/post --tag reading
 
 ## Source & toolkit authoring
 
-The CLI is the local SDK toolchain for `@ontrove/sdk` (sources) and `@ontrove/mcp`
-(your own toolkits): scaffold, run locally, then push.
+The CLI is the local toolchain for `@ontrove/extend` — `/source` for sources and
+`/toolkit` for your own toolkits: scaffold, run locally, then push.
 
 ```bash
 # Sources (client-side execution → ingestDocuments)
@@ -79,7 +79,7 @@ trove source validate                         # lint manifest (credential-key ch
 trove source sync --source "My Blog" --feed default --create   # → ingestDocuments
 trove source deploy                           # → deploySource; Trove runs it on a schedule
 
-# Toolkits (@ontrove/mcp)
+# Toolkits (@ontrove/extend/toolkit)
 trove mcp init my-server                 # scaffold manifest.json + server.ts
 cd my-server
 trove mcp dev --port 8788                # bundle + serve over http://127.0.0.1:8788
@@ -147,13 +147,13 @@ overrides a profile's `api_url`.
 | `stats` | `query stats` | Read |
 | `save` | `mutation saveDocument` | Write |
 | `ingest` | `mutation ingestDocuments` (cursor CAS) | Write |
-| `source init` | — (scaffold `@ontrove/sdk` project) | Local |
+| `source init` | — (scaffold `@ontrove/extend/source` project) | Local |
 | `source dev` | — (local `sync(ctx)` on Bun) | Local |
 | `source test` | — (local fixtures assertion) | Local |
 | `source validate` | — (`validateSourceManifest`) | Local |
 | `source sync` | `mutation ingestDocuments` (+ `createSource`/`addFeed` w/ `--create`) | Write |
 | `source deploy` | `mutation deploySource` | Write |
-| `mcp init` | — (scaffold `@ontrove/mcp` project) | Local |
+| `mcp init` | — (scaffold `@ontrove/extend/toolkit` project) | Local |
 | `mcp dev` | — (local server over `127.0.0.1`) | Local |
 | `mcp logs` | — (explains the deployed runtime log gap) | Info |
 | `mcp ls` | `query mcpServers` | Read |
@@ -190,17 +190,17 @@ later:
 ## Development
 
 ```bash
-bun install        # from the packages/ workspace root (links @ontrove/mcp + @ontrove/sdk)
+bun install        # from the packages/ workspace root (links @ontrove/extend)
 bun run typecheck  # tsc --noEmit (strict)
 bun run lint       # biome check
 bun run test       # vitest (mocked fetch — no network, no credentials)
 bun run build      # tsc → dist/ (the `trove` bin)
 ```
 
-> `@ontrove/cli` lives in the `packages/` bun workspace alongside `@ontrove/mcp` and
-> `@ontrove/sdk`, which it depends on via published semver. A single `bun install`
-> at `packages/` links all three locally; building `@ontrove/mcp` and `@ontrove/sdk`
-> first (`bun run build` in each) makes their `dist/` available to the CLI.
+> `@ontrove/cli` lives in the `packages/` bun workspace alongside `@ontrove/extend`,
+> which it depends on via published semver. A single `bun install` at `packages/`
+> links both locally; building `@ontrove/extend` first (`bun run build` in it) makes
+> its `dist/` available to the CLI.
 
 All tests run against a mocked GraphQL endpoint and a temp `$HOME`; none touch the
 network. The OAuth browser/loopback and OS-keychain seams are injected and mocked

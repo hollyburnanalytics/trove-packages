@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { defineSource, type TroveSource } from '@ontrove/sdk';
+import { defineSource, type TroveSource } from '@ontrove/extend/source';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as sourceDev from '../src/commands/source-dev.js';
 import { buildContext, type CommandContext } from '../src/context.js';

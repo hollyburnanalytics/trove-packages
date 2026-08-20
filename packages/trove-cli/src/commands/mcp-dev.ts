@@ -2,7 +2,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { basename, isAbsolute, join, resolve } from 'node:path';
-import { type FetchHandler, type McpServerDefinition, toFetchHandler } from '@ontrove/mcp';
+import { type FetchHandler, type ToolkitDefinition, toFetchHandler } from '@ontrove/extend/toolkit';
 import type { CommandContext } from '../context.js';
 import { ExitCode, usageError } from '../errors.js';
 import { intFlag, type ParsedArgs } from '../lib/args.js';
@@ -10,7 +10,7 @@ import { type LoadModuleOptions, loadModule, writeNew } from '../lib/bundle.js';
 import { renderJson, renderTable } from '../output.js';
 
 /**
- * The hosted-MCP dev toolchain, over `@ontrove/mcp`. `init`
+ * The hosted-MCP dev toolchain, over `@ontrove/extend/toolkit`. `init`
  * scaffolds `manifest.json` + `server.ts`; `dev` loads `server.ts` with Bun,
  * wraps it in the SDK's runtime fetch handler, and serves it over
  * `http://127.0.0.1:<port>` so a client can connect; `logs` explains that
@@ -47,7 +47,7 @@ function projectDir(args: ParsedArgs): string {
 
 /**
  * `trove mcp init <name>` — scaffold `<name>/manifest.json` + `<name>/server.ts`
- * (a `defineMcpServer` stub with a sample tool, `annotations`, and `output`). No
+ * (a `defineToolkit` stub with a sample tool, `annotations`, and `output`). No
  * GraphQL.
  *
  * @param ctx - The command context.
@@ -82,14 +82,14 @@ export async function init(ctx: CommandContext, args: ParsedArgs): Promise<numbe
 }
 
 /** The scaffolded `server.ts` stub for `mcp init`. */
-const SERVER_STUB = `import { defineMcpServer, z } from '@ontrove/mcp';
+const SERVER_STUB = `import { defineToolkit, z } from '@ontrove/extend/toolkit';
 
 /**
  * A hosted Trove MCP server: declare tools with a Zod \`input\` schema and a
  * handler. The handler receives validated args and a capability \`ctx\` (no
  * ambient authority). See the hosted-MCP SDK reference.
  */
-export default defineMcpServer({
+export default defineToolkit({
   tools: [
     {
       name: 'echo',
@@ -130,14 +130,14 @@ export async function dev(
     throw usageError(`No server.ts in '${dir}'. Run 'trove mcp init <name>' first.`);
   }
   const load = deps.load ?? loadModule;
-  const server = await load<McpServerDefinition>(entry);
+  const server = await load<ToolkitDefinition>(entry);
   if (
     server === null ||
     typeof server !== 'object' ||
     typeof server.handle !== 'function' ||
     !Array.isArray(server.tools)
   ) {
-    throw usageError(`${entry} default export is not a server (expected defineMcpServer(...)).`);
+    throw usageError(`${entry} default export is not a server (expected defineToolkit(...)).`);
   }
 
   const port = intFlag(args, 'port') ?? 8788;

@@ -1,4 +1,14 @@
-# @ontrove/sdk
+# @ontrove/extend
+
+## 4.0.0
+
+No changes to this package. `@ontrove/extend` and `@ontrove/cli` are a
+`fixed` group in `.changeset/config.json`, so they always carry the same
+version — and `@ontrove/cli@4.0.0` is a breaking change (`trove mcp <…>`
+became `trove toolkit <…>`). The API here is identical to 3.3.0.
+
+Upgrading is still worth doing so a project's `@ontrove/*` versions agree,
+but nothing in your code has to change.
 
 ## 3.3.0
 

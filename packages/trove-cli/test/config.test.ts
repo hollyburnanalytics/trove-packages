@@ -456,8 +456,12 @@ describe('config', () => {
         prod: { name: 'prod', apiUrl: 'https://x', issuer: 'i', tokenRef: 'keychain:trove-prod' },
       },
     };
-    // No keychain available on CI → the ref resolves to no token.
-    expect(resolveProfile(config, { env: {} }).token).toBeUndefined();
+    // The absent keychain is INJECTED, not assumed. Reading the developer's real
+    // keychain made this pass on CI and fail on any machine that had logged in —
+    // asserting a property of the machine rather than of `resolveProfile`.
+    expect(
+      resolveProfile(config, { env: {}, keychain: { platform: 'win32' } }).token,
+    ).toBeUndefined();
   });
 
   it('resolveProfile falls back to defaults for an unknown profile name', () => {

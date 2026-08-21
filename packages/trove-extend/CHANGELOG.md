@@ -1,5 +1,10 @@
 # @ontrove/extend
 
+## 4.1.0
+
+No changes to this package — the `fixed` group following `@ontrove/cli@4.1.0`
+(`extension.ts` as the entry filename). Identical to 4.0.0.
+
 ## 4.0.0
 
 No changes to this package. `@ontrove/extend` and `@ontrove/cli` are a

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { basename, isAbsolute, join, resolve } from 'node:path';
@@ -6,12 +6,18 @@ import { type FetchHandler, type ToolkitDefinition, toFetchHandler } from '@ontr
 import type { CommandContext } from '../context.js';
 import { ExitCode, usageError } from '../errors.js';
 import { intFlag, type ParsedArgs } from '../lib/args.js';
-import { type LoadModuleOptions, loadModule, writeNew } from '../lib/bundle.js';
+import {
+  findToolkitEntry,
+  type LoadModuleOptions,
+  loadModule,
+  TOOLKIT_ENTRY_FILENAMES,
+  writeNew,
+} from '../lib/bundle.js';
 import { renderJson, renderTable } from '../output.js';
 
 /**
  * The toolkit dev toolchain, over `@ontrove/extend/toolkit`. `init`
- * scaffolds `manifest.json` + `server.ts`; `dev` loads `server.ts` with Bun,
+ * scaffolds `manifest.json` + `extension.ts`; `dev` loads it with Bun,
  * wraps it in the SDK's runtime fetch handler, and serves it over
  * `http://127.0.0.1:<port>` so a client can connect; `logs` explains that
  * per-script logs come from the deployed hosted runtime (there is no logs GraphQL
@@ -46,7 +52,7 @@ function projectDir(args: ParsedArgs): string {
 }
 
 /**
- * `trove toolkit init <name>` — scaffold `<name>/manifest.json` + `<name>/server.ts`
+ * `trove toolkit init <name>` — scaffold `<name>/manifest.json` + `<name>/extension.ts`
  * (a `defineToolkit` stub with a sample tool, `annotations`, and `output`). No
  * GraphQL.
  *
@@ -64,7 +70,7 @@ export async function init(ctx: CommandContext, args: ParsedArgs): Promise<numbe
     .toLowerCase()
     .replace(/[^a-z0-9-]+/g, '-')
     .replace(/^-+|-+$/g, '');
-  // ONE declaration, used twice: written into `server.ts` as the argument to
+  // ONE declaration, used twice: written into `extension.ts` as the argument to
   // `defineToolkit`, and emitted as `manifest.json` from the same object. The
   // two used to be written separately, and the manifest half had no `icon` or
   // `version` at all — fields the directory shows and the deploy records.
@@ -83,20 +89,20 @@ export async function init(ctx: CommandContext, args: ParsedArgs): Promise<numbe
     join(dir, 'manifest.json'),
     `${JSON.stringify({ ...declaration, generated: true }, null, 2)}\n`,
   );
-  writeNew(join(dir, 'server.ts'), serverStub(declaration));
+  writeNew(join(dir, 'extension.ts'), serverStub(declaration));
 
   ctx.writer.err(ctx.style.green(`✓ scaffolded toolkit '${basename(name)}' in ${dir}`));
   ctx.writer.err(
-    ctx.style.dim('Next: edit server.ts, then `trove toolkit dev` to serve it locally.'),
+    ctx.style.dim('Next: edit extension.ts, then `trove toolkit dev` to serve it locally.'),
   );
   return Promise.resolve(ExitCode.Success);
 }
 
 /**
- * The scaffolded `server.ts`, built from the same declaration the manifest is.
+ * The scaffolded `extension.ts`, built from the same declaration the manifest is.
  *
  * @param declaration - The toolkit's manifest fields.
- * @returns The `server.ts` contents.
+ * @returns The `extension.ts` contents.
  */
 function serverStub(declaration: Record<string, unknown>): string {
   const fields = JSON.stringify(declaration, null, 2).slice(2, -2);
@@ -126,6 +132,28 @@ ${fields},
 }
 
 /**
+ * The toolkit's entry module in `dir`, or a usage error naming what is missing.
+ *
+ * A thin wrapper over {@link findToolkitEntry} because `dev` and `deploy` word
+ * the failure differently; the LIST they search is shared, which is the part
+ * that must not diverge.
+ *
+ * @param dir - The toolkit project directory.
+ * @returns Absolute path to the entry module.
+ * @throws When the directory holds none of them.
+ */
+function toolkitEntry(dir: string): string {
+  const entry = findToolkitEntry(dir);
+  if (entry === null) {
+    throw usageError(
+      `No ${TOOLKIT_ENTRY_FILENAMES.join(' or ')} in '${dir}'. ` +
+        "Run 'trove toolkit init <name>' first.",
+    );
+  }
+  return entry;
+}
+
+/**
  * `trove toolkit dev [path]` — load `server.ts` (Bun), wrap it with the SDK
  * runtime fetch handler, and serve it over `http://127.0.0.1:<port>`. Prints the
  * local URL and the tool list. `ctx.secret`/`ctx.trove` callbacks resolve
@@ -145,10 +173,7 @@ export async function dev(
   deps: ToolkitDevDeps = {},
 ): Promise<number> {
   const dir = projectDir(args);
-  const entry = join(dir, 'server.ts');
-  if (!existsSync(entry)) {
-    throw usageError(`No server.ts in '${dir}'. Run 'trove toolkit init <name>' first.`);
-  }
+  const entry = toolkitEntry(dir);
   const load = deps.load ?? loadModule;
   const server = await load<ToolkitDefinition>(entry);
   if (

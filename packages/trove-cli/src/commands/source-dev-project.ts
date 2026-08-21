@@ -43,6 +43,15 @@ export function readManifest(dir: string): Record<string, unknown> {
 }
 
 /**
+ * The filenames a source's entry module may carry, most-preferred first.
+ *
+ * `extension.ts` is the convention; the two `index.*` names are what came
+ * before and still exist in the wild — this CLI opens directories that belong
+ * to the user, not a catalog anyone versions, so it has to read what is there.
+ */
+const SOURCE_ENTRY_FILENAMES = ['extension.ts', 'index.ts', 'index.mjs'] as const;
+
+/**
  * The entry file of a source project.
  *
  * TypeScript wins when both exist, because that is what `source init`
@@ -57,11 +66,14 @@ export function readManifest(dir: string): Record<string, unknown> {
  * @throws {@link CliError} (usage) when the directory holds neither.
  */
 export function sourceEntry(dir: string): string {
-  for (const name of ['index.ts', 'index.mjs']) {
+  for (const name of SOURCE_ENTRY_FILENAMES) {
     const candidate = join(dir, name);
     if (existsSync(candidate)) return candidate;
   }
-  throw usageError(`No index.ts or index.mjs in '${dir}'. Run 'trove source init <name>' first.`);
+  throw usageError(
+    `No ${SOURCE_ENTRY_FILENAMES.join(', ')} in '${dir}'. ` +
+      "Run 'trove source init <name>' first.",
+  );
 }
 
 /** Load the source from a project dir, in either shape an adapter may be written in. */

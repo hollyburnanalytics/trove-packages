@@ -93,7 +93,7 @@ export async function init(ctx: CommandContext, args: ParsedArgs): Promise<numbe
     join(dir, 'manifest.json'),
     `${JSON.stringify({ ...declaration, generated: true }, null, 2)}\n`,
   );
-  writeNew(join(dir, 'index.ts'), sourceStub(declaration));
+  writeNew(join(dir, 'extension.ts'), sourceStub(declaration));
 
   ctx.writer.err(ctx.style.green(`✓ scaffolded source '${basename(name)}' in ${dir}`));
   ctx.writer.err(ctx.style.dim('Next: edit index.ts, then `trove source dev` to run it.'));

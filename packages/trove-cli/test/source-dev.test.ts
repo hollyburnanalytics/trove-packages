@@ -40,14 +40,14 @@ describe('source init', () => {
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-  it('scaffolds manifest.json + index.ts', async () => {
+  it('scaffolds manifest.json + extension.ts', async () => {
     const ctx = buildContext({ globals: {}, writer, isTTY: false, configEnv: { home: dir } });
     const code = await sourceDev.init(ctx, parseArgs([join(dir, 'my-blog')]));
     expect(code).toBe(ExitCode.Success);
     const projDir = join(dir, 'my-blog');
     const manifest = JSON.parse(readFileSync(join(projDir, 'manifest.json'), 'utf8'));
     expect(manifest.id).toBe('my-blog');
-    expect(existsSync(join(projDir, 'index.ts'))).toBe(true);
+    expect(existsSync(join(projDir, 'extension.ts'))).toBe(true);
   });
 
   it('requires a name', async () => {
@@ -65,7 +65,7 @@ describe('source dev', () => {
     dir = mkdtempSync(join(tmpdir(), 'trove-conn-'));
     writer = captureWriter();
     writeFileSync(join(dir, 'manifest.json'), '{"id":"x","name":"X","version":"1.0.0"}');
-    writeFileSync(join(dir, 'index.ts'), '// source');
+    writeFileSync(join(dir, 'extension.ts'), '// source');
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -113,7 +113,7 @@ describe('source dev', () => {
   });
 
   it('errors when index.ts is missing', async () => {
-    rmSync(join(dir, 'index.ts'));
+    rmSync(join(dir, 'extension.ts'));
     const mock = mockFetch({});
     await expect(
       sourceDev.dev(ctxFor(mock, writer, dir), parseArgs([dir]), loaderFor(source)),
@@ -269,7 +269,7 @@ describe('source test', () => {
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'trove-conn-'));
     writer = captureWriter();
-    writeFileSync(join(dir, 'index.ts'), '// source');
+    writeFileSync(join(dir, 'extension.ts'), '// source');
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -462,7 +462,7 @@ describe('source test', () => {
   });
 
   it('source validate --json on an invalid manifest', async () => {
-    rmSync(join(dir, 'index.ts'));
+    rmSync(join(dir, 'extension.ts'));
     writeFileSync(
       join(dir, 'manifest.json'),
       JSON.stringify({ title: 'Fixture', id: 'BAD UPPER', name: 'x', version: 'nope' }),
@@ -489,7 +489,7 @@ describe('source sync', () => {
       join(dir, 'manifest.json'),
       JSON.stringify({ title: 'Fixture', id: 'my-blog', name: 'My Blog', version: '1.0.0' }),
     );
-    writeFileSync(join(dir, 'index.ts'), '// source');
+    writeFileSync(join(dir, 'extension.ts'), '// source');
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -815,7 +815,7 @@ describe('source deploy', () => {
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'trove-conn-'));
     writer = captureWriter();
-    writeFileSync(join(dir, 'index.ts'), '// source');
+    writeFileSync(join(dir, 'extension.ts'), '// source');
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -870,7 +870,7 @@ describe('source deploy', () => {
       bundlerFor(entries),
     );
     expect(code).toBe(ExitCode.Success);
-    expect(entries).toEqual([join(dir, 'index.ts')]);
+    expect(entries).toEqual([join(dir, 'extension.ts')]);
     expect(mock.calls[0]?.operationName).toBe('CliDeploySource');
     expect(mock.calls[0]?.variables.slug).toBe('my-blog');
     expect(mock.calls[0]?.variables.manifest).toMatchObject({
@@ -886,7 +886,7 @@ describe('source deploy', () => {
     // could not deploy a single source in the catalogue it exists to serve —
     // every one is plain ESM, including ones already running in production,
     // which had to be deployed some other way. esbuild bundles either.
-    rmSync(join(dir, 'index.ts'));
+    rmSync(join(dir, 'extension.ts'));
     writeFileSync(join(dir, 'index.mjs'), '// source');
     writeManifest();
     const entries: string[] = [];
@@ -908,11 +908,11 @@ describe('source deploy', () => {
       parseArgs([dir], { value: ['slug'] }),
       bundlerFor(entries),
     );
-    expect(entries).toEqual([join(dir, 'index.ts')]);
+    expect(entries).toEqual([join(dir, 'extension.ts')]);
   });
 
-  it('names both filenames when neither is there', async () => {
-    rmSync(join(dir, 'index.ts'));
+  it('names every accepted filename when none is there', async () => {
+    rmSync(join(dir, 'extension.ts'));
     writeManifest();
     await expect(
       sourceDev.deploy(
@@ -920,7 +920,7 @@ describe('source deploy', () => {
         parseArgs([dir], { value: ['slug'] }),
         {},
       ),
-    ).rejects.toThrow(/index\.ts or index\.mjs/);
+    ).rejects.toThrow(/extension\.ts, index\.ts, index\.mjs/);
   });
 
   it('refuses a manifest with no egress, naming the file', async () => {
@@ -972,13 +972,13 @@ describe('source deploy', () => {
     ).rejects.toThrow(/--slug/);
   });
 
-  it('errors when index.ts is absent', async () => {
+  it('errors when no entry module is present', async () => {
     writeManifest();
-    rmSync(join(dir, 'index.ts'));
+    rmSync(join(dir, 'extension.ts'));
     const mock = mockFetch(deployResponse('LIVE'));
     await expect(
       sourceDev.deploy(ctxFor(mock, writer, dir), parseArgs([dir], { value: ['slug'] }), {}),
-    ).rejects.toThrow(/No index\.ts/);
+    ).rejects.toThrow(/No extension\.ts/);
   });
 
   it('fails when the deployment did not go live, saying why', async () => {

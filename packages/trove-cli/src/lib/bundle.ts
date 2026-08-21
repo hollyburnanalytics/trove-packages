@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -32,6 +32,32 @@ interface ModuleNamespace {
   default?: unknown;
   /** Any named export — read structurally by the source loaders. */
   [name: string]: unknown;
+}
+
+/**
+ * The filenames a toolkit's entry module may carry, most-preferred first.
+ *
+ * `extension.ts` is the convention; `server.ts` is what came before.
+ *
+ * Lives here, in the module both `toolkit dev` and `toolkit deploy` already
+ * import, because it was two lists for about ten minutes and that was long
+ * enough to ship a `dev` that found the file and a `deploy` that did not.
+ */
+export const TOOLKIT_ENTRY_FILENAMES = ['extension.ts', 'server.ts'] as const;
+
+/**
+ * The toolkit's entry module in `dir`.
+ *
+ * @param dir - The toolkit project directory.
+ * @returns Absolute path to the entry module, or `null` when there is none —
+ *   the caller raises, because `dev` and `deploy` word it differently.
+ */
+export function findToolkitEntry(dir: string): string | null {
+  for (const name of TOOLKIT_ENTRY_FILENAMES) {
+    const candidate = join(dir, name);
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
 }
 
 /** Options for {@link loadModule}/{@link bundleServer} (injection points for tests). */

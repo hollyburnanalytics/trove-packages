@@ -43,7 +43,7 @@ describe('toolkit init', () => {
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-  it('scaffolds manifest.json + server.ts', async () => {
+  it('scaffolds manifest.json + extension.ts', async () => {
     const ctx = buildContext({ globals: {}, writer, isTTY: false, configEnv: { home: dir } });
     const code = await toolkitDev.init(ctx, parseArgs([join(dir, 'my-srv')]));
     expect(code).toBe(ExitCode.Success);
@@ -51,7 +51,7 @@ describe('toolkit init', () => {
     const manifest = JSON.parse(readFileSync(join(proj, 'manifest.json'), 'utf8'));
     expect(manifest.id).toBe('my-srv');
     expect(Array.isArray(manifest.secrets)).toBe(true);
-    expect(existsSync(join(proj, 'server.ts'))).toBe(true);
+    expect(existsSync(join(proj, 'extension.ts'))).toBe(true);
   });
 
   it('requires a name', async () => {
@@ -77,7 +77,7 @@ describe('toolkit dev', () => {
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'trove-toolkit-'));
     writer = captureWriter();
-    writeFileSync(join(dir, 'server.ts'), '// server');
+    writeFileSync(join(dir, 'extension.ts'), '// server');
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -144,7 +144,7 @@ describe('toolkit dev', () => {
   });
 
   it('errors when server.ts is missing', async () => {
-    rmSync(join(dir, 'server.ts'));
+    rmSync(join(dir, 'extension.ts'));
     const ctx = buildContext({ globals: {}, writer, isTTY: false, configEnv: { home: dir } });
     await expect(
       toolkitDev.dev(ctx, parseArgs([dir, '--once'], { boolean: ['once'] }), deps()),
@@ -200,7 +200,7 @@ describe('toolkit dev — live serve seam', () => {
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'trove-toolkit-'));
     writer = captureWriter();
-    writeFileSync(join(dir, 'server.ts'), '// server');
+    writeFileSync(join(dir, 'extension.ts'), '// server');
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 

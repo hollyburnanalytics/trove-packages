@@ -3,7 +3,12 @@ import { join } from 'node:path';
 import type { CommandContext } from '../context.js';
 import { ExitCode, usageError } from '../errors.js';
 import { flag, type ParsedArgs } from '../lib/args.js';
-import { bundleServer, type ServerBundle } from '../lib/bundle.js';
+import {
+  bundleServer,
+  findToolkitEntry,
+  type ServerBundle,
+  TOOLKIT_ENTRY_FILENAMES,
+} from '../lib/bundle.js';
 import * as ops from '../operations.js';
 import { renderJson, renderTable } from '../output.js';
 import type { Toolkit } from '../types.js';
@@ -106,9 +111,12 @@ export async function deploy(
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>;
   const { name, slug } = resolveNameAndSlug(args, manifest);
 
-  const serverEntry = join(dir, 'server.ts');
-  if (!existsSync(serverEntry)) {
-    throw usageError(`No server.ts in '${dir}'. Run 'trove toolkit init <name>' first.`);
+  const serverEntry = findToolkitEntry(dir);
+  if (serverEntry === null) {
+    throw usageError(
+      `No ${TOOLKIT_ENTRY_FILENAMES.join(' or ')} in '${dir}'. ` +
+        "Run 'trove toolkit init <name>' first.",
+    );
   }
   ctx.writer.err(ctx.style.dim(`Bundling ${serverEntry}…`));
 

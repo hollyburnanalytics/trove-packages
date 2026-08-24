@@ -402,8 +402,16 @@ export interface ToolkitConfig {
    * a value here would be a secret in a file everybody can read.
    */
   secrets?: ReadonlyArray<string>;
-  /** Whether the toolkit is listed publicly or kept to its owner. */
-  visibility?: 'public' | 'private';
+  /**
+   * Whether the toolkit is reachable beyond its owner, or kept to them.
+   *
+   * `shared` rather than `public` so there is one spelling end to end: the
+   * value is stored as the GraphQL `McpServerVisibility` enum, whose members
+   * are `PRIVATE` and `SHARED`. It previously read `public` here and `SHARED`
+   * there, with nothing translating between them — a field can only be
+   * checked against a schema if both ends name the same thing.
+   */
+  visibility?: 'shared' | 'private';
   /** The preference fields shown in the toolkit's settings. */
   config?: Record<string, ManifestConfigField>;
   /** The tools this server exposes. At least one is required. */
@@ -549,6 +557,21 @@ export type ToolErrorCode = 'INVALID_PARAMS' | 'UNKNOWN_TOOL' | 'TOOL_ERROR' | '
 export interface ToolkitDefinition {
   /** The `tools/list` descriptors (names un-namespaced, schemas compiled). */
   readonly tools: ReadonlyArray<ToolListEntry>;
+  /**
+   * What this toolkit IS, as the JSON its catalog commits — the output of
+   * {@link toToolkitManifest} for the declaration that produced this server.
+   *
+   * Present so a catalog can check its committed `manifest.json` against the
+   * code, which until now it could not: `defineSource` returns the source
+   * object itself, so its manifest fields stay reachable and a contract test
+   * can regenerate them, while `defineToolkit` returned only `tools` and
+   * `handle` and dropped the declaration on the floor. That asymmetry is why
+   * `toToolkitManifest` shipped with zero callers and why toolkit manifests
+   * were hand-maintained against nothing. Deploy reads `egress`, `scopes` and
+   * `secrets` off the committed file, so a manifest that drifts from the code
+   * ships the old permissions.
+   */
+  readonly manifest: Readonly<Record<string, unknown>>;
   /**
    * Handle one normalized tool call: validate args, build `ctx`, run the
    * handler inside a try/catch, and normalize the outcome.

@@ -290,8 +290,12 @@ function checkIdentity(config: ToolkitConfig, errors: string[]): void {
   if (typeof config.version === 'string' && !/^\d+\.\d+\.\d+(-[\w.]+)?$/.test(config.version)) {
     errors.push(`version ${JSON.stringify(config.version)} is not a semver string`);
   }
-  if (config.visibility !== undefined && !['public', 'private'].includes(config.visibility)) {
-    errors.push(`visibility ${JSON.stringify(config.visibility)} must be "public" or "private"`);
+  // `shared`, not `public`: the value is stored as the GraphQL
+  // `McpServerVisibility` enum, whose members are PRIVATE and SHARED. This
+  // accepted `public` while the schema accepted `SHARED` and nothing
+  // translated, so the field could never be checked end to end.
+  if (config.visibility !== undefined && !['shared', 'private'].includes(config.visibility)) {
+    errors.push(`visibility ${JSON.stringify(config.visibility)} must be "shared" or "private"`);
   }
 }
 
@@ -406,7 +410,11 @@ export function defineToolkit(
     return runHandler(tool, parsed.data, ctx, logBuffer, knownSecrets);
   }
 
-  return { tools: list, handle };
+  // The manifest travels with the compiled server so a catalog can check its
+  // committed `manifest.json` against the declaration that produced it.
+  // Without this the config is unreachable once `defineToolkit` returns, which
+  // is why `toToolkitManifest` shipped with no callers.
+  return { tools: list, manifest: toToolkitManifest(config), handle };
 }
 
 /**

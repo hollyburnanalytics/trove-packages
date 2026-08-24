@@ -42,6 +42,17 @@ describe('defineToolkit — the toolkit declares itself', () => {
     expect(() => defineToolkit(config({ visibility: 'secret' as never }))).toThrow(/visibility/);
   });
 
+  it('spells the shared value the way the schema stores it', () => {
+    // `shared`, not `public`. The value is persisted as the GraphQL
+    // `McpServerVisibility` enum, whose members are PRIVATE and SHARED, and
+    // nothing translated between the two spellings — so the field went out to
+    // three places under two names and could not be checked end to end.
+    expect(() => defineToolkit(config({ visibility: 'shared' }))).not.toThrow();
+    expect(() => defineToolkit(config({ visibility: 'public' as never }))).toThrow(
+      /must be "shared" or "private"/,
+    );
+  });
+
   it('rejects a secret that looks like a value rather than a name', () => {
     // A manifest is committed. A secret in it is a secret in the repo, so the
     // field takes NAMES and the shape is the only thing standing between the
@@ -87,5 +98,25 @@ describe('toToolkitManifest', () => {
     expect(manifest.secrets).toEqual(['API_KEY']);
     expect(manifest.egress).toEqual(['example.com']);
     expect(manifest.visibility).toBe('private');
+  });
+
+  it('travels on the compiled server, so a catalog can check its committed copy', () => {
+    // Until this existed, `toToolkitManifest` had no way to be called on a
+    // real toolkit: `defineToolkit` returned only `tools` and `handle`, so the
+    // declaration was unreachable the moment the module finished loading.
+    // `defineSource` returns the source object itself, which is why sources
+    // had a contract test pinning manifest to code and toolkits did not.
+    //
+    // It is not cosmetic. Deploy reads `egress`, `scopes` and `secrets` off
+    // the committed file, so a manifest that drifts from the code ships the
+    // permissions the code no longer asks for.
+    const declaration = config({ secrets: ['API_KEY'], egress: ['example.com'] });
+    const definition = defineToolkit(declaration);
+
+    expect(definition.manifest).toEqual(toToolkitManifest(declaration));
+    expect(definition.manifest).not.toHaveProperty('tools');
+    expect(definition.manifest).not.toHaveProperty('auth');
+    expect(definition.manifest.generated).toBe(true);
+    expect(definition.manifest.egress).toEqual(['example.com']);
   });
 });

@@ -300,13 +300,22 @@ describe('toolkit deploy via run() (real Bun bundler, mocked GraphQL)', () => {
     });
   });
 
-  it('deploy (top-level alias) maps to CliDeployServer', async () => {
+  it('refuses a bare `deploy`, because it cannot know which kind', async () => {
+    // There is no top-level `deploy` alias, and there should not be: the
+    // registry carries `source deploy` and `toolkit deploy`, and a directory
+    // holding a manifest is not enough to tell them apart. Guessing would
+    // deploy the wrong kind of thing from a one-word command.
+    //
+    // This test asserted the alias worked until `mcp` became `toolkit`
+    // (e33fc72) removed it. It kept asserting it for two releases — the CLI
+    // was right and the test was wrong, which is why `check` had been red on
+    // main since 2026-08-23 and no release could go out.
     writeFileSync(join(home.home, 'manifest.json'), JSON.stringify({ name: 'A', slug: 'a' }));
     writeFileSync(join(home.home, 'server.ts'), SERVER_SRC);
     const mock = mockFetch(deployResponse([]));
     const code = await runCli(['deploy', '--dir', home.home], mock, writer, home);
-    expect(code).toBe(ExitCode.Success);
-    expect(mock.calls[0]?.operationName).toBe('CliDeployServer');
+    expect(code).toBe(ExitCode.Usage);
+    expect(mock.calls).toHaveLength(0);
   });
 });
 

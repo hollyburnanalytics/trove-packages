@@ -16,10 +16,16 @@
  * @module
  */
 
-import { makeEgressFetch, makeFetchJson, makeRequireSecret } from './auth.js';
+import {
+  makeEgressFetch,
+  makeFetchJson,
+  makeRequireAccessToken,
+  makeRequireSecret,
+} from './auth.js';
 import { redactSecrets } from './redact.js';
 import type {
   OAuth2ClientCredentials,
+  OAuthConnection,
   ToolContext,
   TroveClient,
   TroveDocument,
@@ -59,7 +65,7 @@ export interface CtxParams {
    */
   now?: () => Date;
   /** Optional declarative auth; when set, egress carries an auto-minted Bearer. */
-  auth?: OAuth2ClientCredentials;
+  auth?: OAuth2ClientCredentials | OAuthConnection;
   /** Optional egress host allowlist (deny-by-default when non-empty). */
   egress?: readonly string[];
   /**
@@ -218,7 +224,11 @@ function makeLog(p: Pick<CtxParams, 'logSink' | 'knownSecrets'>): ToolContext['l
 export function buildCtx(p: CtxParams): ToolContext {
   const secret = makeSecret(p);
   const requireSecret = makeRequireSecret(secret);
-  const fetch = makeEgressFetch(p.fetchImpl, p.auth, requireSecret, p.egress);
+  // Only the client-credentials flow auto-attaches a Bearer to egress. A
+  // user's connection is handed to the handler instead, because only the
+  // handler knows which of its calls the token belongs on.
+  const grantAuth = p.auth?.type === 'oauth2_client_credentials' ? p.auth : undefined;
+  const fetch = makeEgressFetch(p.fetchImpl, grantAuth, requireSecret, p.egress);
   const base: {
     userId: string;
     secret: ToolContext['secret'];
@@ -241,6 +251,10 @@ export function buildCtx(p: CtxParams): ToolContext {
     log: makeLog(p),
     now: p.now ?? ((): Date => new Date()),
   };
+
+  if (p.auth?.type === 'oauth_connection') {
+    Object.assign(base, { requireAccessToken: makeRequireAccessToken(secret, p.auth) });
+  }
 
   if (p.troveEnabled) {
     base.trove = makeTroveClient(p);

@@ -17,12 +17,12 @@ import { ToolError } from './errors.js';
 import { redactSecrets } from './redact.js';
 import { compileInputSchema } from './schema.js';
 import type {
-  OAuth2ClientCredentials,
   ToolAnnotations,
   ToolCall,
   ToolCallResult,
   ToolContext,
   ToolDefinition,
+  ToolkitAuth,
   ToolkitConfig,
   ToolkitDefinition,
   ToolListEntry,
@@ -39,8 +39,18 @@ const TOOL_NAME_RE = /^[a-zA-Z0-9_-]+$/;
  * @param auth - The auth config, if any.
  * @throws {Error} If the auth block is present but malformed.
  */
-function validateAuth(auth: OAuth2ClientCredentials | undefined): void {
+function validateAuth(auth: ToolkitAuth | undefined): void {
   if (auth === undefined) return;
+  if (auth.type === 'oauth_connection') {
+    // The provider must be one Trove holds an app for; the platform refuses an
+    // unknown id at connect time, and this catches the typo at deploy time.
+    if (typeof auth.provider !== 'string' || auth.provider.length === 0) {
+      throw new Error('auth.provider must be a non-empty string (a Trove OAuth provider id)');
+    }
+    // Nothing else to check: a connection names no secrets, because the client
+    // credentials are Trove's rather than the toolkit's.
+    return;
+  }
   if (auth.type !== 'oauth2_client_credentials') {
     throw new Error(`unsupported auth.type: ${String((auth as { type?: unknown }).type)}`);
   }
@@ -347,8 +357,15 @@ function validateToolkitManifest(config: ToolkitConfig): void {
  * @returns The manifest fields, plus the `generated` marker.
  */
 export function toToolkitManifest(config: ToolkitConfig): Record<string, unknown> {
-  const { tools: _tools, auth: _auth, ...manifest } = config;
-  return { ...manifest, generated: true };
+  const { tools: _tools, auth, ...manifest } = config;
+  // A CONNECTION is carried into the manifest; a client-credentials block is
+  // not. The platform has to know a toolkit connects through OAuth — it renders
+  // the Connect button and grants the toolkit the reserved credential name —
+  // and the block holds nothing secret to carry. Client-credentials auth stays
+  // out for the reason it always was: it is wiring between the toolkit and its
+  // own vaulted secrets, and the platform has no part in it.
+  const declared = auth?.type === 'oauth_connection' ? { auth } : {};
+  return { ...manifest, ...declared, generated: true };
 }
 
 export function defineToolkit(

@@ -13,7 +13,7 @@
 
 import { assertEgressAllowed } from './egress.js';
 import { ToolError } from './errors.js';
-import type { OAuth2ClientCredentials, ToolContext } from './types.js';
+import type { OAuth2ClientCredentials, OAuthConnection, ToolContext } from './types.js';
 
 /** A standard `fetch`-shaped function (the platform egress entry point). */
 type FetchLike = (input: string | URL, init?: RequestInit) => Promise<Response>;
@@ -65,6 +65,39 @@ export function makeRequireSecret(secret: ToolContext['secret']): ToolContext['r
         {
           retryable: false,
         },
+      );
+    }
+    return value;
+  };
+}
+
+/**
+ * Build `ctx.requireAccessToken` for a toolkit that declares an OAuth
+ * connection.
+ *
+ * The token is redeemed under the reserved name `oauth:{provider}`, which the
+ * platform grants alongside the manifest's own secrets. Authors never type
+ * that string: the whole point of declaring a connection is that the handler
+ * asks for "the token" and the platform decides whether that means a vault
+ * read, a refresh, or a refusal because the person must reconnect.
+ *
+ * @param secret - The raw `ctx.secret` resolver.
+ * @param connection - The declared connection.
+ * @returns A `requireAccessToken()` function.
+ */
+export function makeRequireAccessToken(
+  secret: ToolContext['secret'],
+  connection: OAuthConnection,
+): NonNullable<ToolContext['requireAccessToken']> {
+  return async (): Promise<string> => {
+    const value = await secret(`oauth:${connection.provider}`);
+    if (!value) {
+      // Not connected, or connected and since rejected by the provider —
+      // either way a person has to visit the dashboard, and no retry here
+      // changes that.
+      throw new ToolError(
+        `This toolkit is not connected to ${connection.provider}. Connect it from the toolkit's page in Trove, then try again.`,
+        { retryable: false },
       );
     }
     return value;

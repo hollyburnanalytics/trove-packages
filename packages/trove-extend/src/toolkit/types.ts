@@ -234,6 +234,21 @@ export interface ToolContext extends ExtensionContext {
   ): Promise<z.infer<S>>;
   fetchJson(url: string | URL, opts?: FetchJsonOpts): Promise<unknown>;
   /**
+   * The current access token for the connection this toolkit declared —
+   * present only when `auth.type` is `oauth_connection`.
+   *
+   * Trove holds the tokens and refreshes them, so what comes back is valid
+   * now: the handler never sees a refresh token, never stores anything, and
+   * never has to know that the provider rotates. Raises, naming the provider,
+   * when nobody has connected it or when the connection needs reauthorizing —
+   * both of which a person fixes in the dashboard, so neither is retryable.
+   *
+   * A handler that receives a 401 anyway (a token revoked mid-call, a clock
+   * further out than the skew) should surface it rather than loop: the
+   * platform already refreshed on the way in.
+   */
+  readonly requireAccessToken?: () => Promise<string>;
+  /**
    * A scoped client over the caller's own knowledge base — present only if
    * the manifest `scopes` requested `trove:search` and/or `trove:ingest`.
    */
@@ -280,6 +295,36 @@ export interface OAuth2ClientCredentials {
    */
   apiHost: string;
 }
+
+/**
+ * A connection Trove holds on the user's behalf — authorization-code OAuth,
+ * where the platform owns the refresh cycle.
+ *
+ * This exists because the interesting providers ROTATE their refresh token:
+ * the provider issues a new one and kills the old, and a toolkit cannot write
+ * a secret back. Every toolkit that tried to hold one itself ended up telling
+ * its user to re-authorize by hand once a day. Declaring this instead means
+ * the platform runs the flow, stores the tokens, refreshes them under a
+ * per-tenant lock, and hands the handler a currently-valid access token
+ * through {@link ToolContext.requireAccessToken}.
+ *
+ * Unlike {@link OAuth2ClientCredentials}, nothing here names a secret: the
+ * client id and secret belong to Trove, not to the toolkit, and the toolkit
+ * never sees either — nor the refresh token.
+ */
+export interface OAuthConnection {
+  /** Discriminant. */
+  type: 'oauth_connection';
+  /** Provider id, from the platform's closed registry (`intuit`, `intuit-sandbox`, …). */
+  provider: string;
+  /** Scopes to request, when the provider's default set is not what this toolkit needs. */
+  scopes?: string[];
+  /** The button a person sees, e.g. `Connect QuickBooks Online`. */
+  connectLabel?: string;
+}
+
+/** How a toolkit authenticates: a client-credentials grant, or a user's connection. */
+export type ToolkitAuth = OAuth2ClientCredentials | OAuthConnection;
 
 /**
  * Behavioral hints for a tool (MCP `annotations`, spec 2025-06-18 / 2025-11-25).
@@ -429,7 +474,7 @@ export interface ToolkitConfig {
    * credential to egress automatically (see {@link OAuth2ClientCredentials}),
    * so handlers issue plain `ctx.fetch`/`ctx.fetchJson` calls.
    */
-  auth?: OAuth2ClientCredentials;
+  auth?: ToolkitAuth;
   /**
    * Optional egress host allowlist (each entry a hostname or `host:port`). When
    * non-empty, the SDK denies any `ctx.fetch` to a host not on the list

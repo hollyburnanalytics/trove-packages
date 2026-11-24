@@ -1,5 +1,12 @@
 # @ontrove/cli
 
+## 6.1.0
+
+### Patch Changes
+
+- Updated dependencies [8308df0]
+  - @ontrove/extend@6.1.0
+
 ## 6.0.0
 
 ### Patch Changes

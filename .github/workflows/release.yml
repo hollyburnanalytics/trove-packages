@@ -73,3 +73,29 @@ jobs:
           else
             echo "CLI not among the published packages; no binaries to build."
           fi
+
+      # A new @ontrove/extend changes the runtime every official toolkit is
+      # bundled with, so ask the trove repo to re-upload all of them. Without
+      # this, a toolkit that needs the new runtime keeps running the old one
+      # until someone redeploys it by hand. Needs TROVE_REPOS_TOKEN (a token
+      # that may send repository_dispatch to hollyburnanalytics/trove); without
+      # it this is skipped with a notice.
+      - name: Redeploy official toolkits on the new runtime
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.TROVE_REPOS_TOKEN }}
+          PUBLISHED: ${{ steps.changesets.outputs.publishedPackages }}
+        run: |
+          set -euo pipefail
+          version=$(printf '%s' "$PUBLISHED" \
+            | jq -r '.[] | select(.name == "@ontrove/extend") | .version')
+          if [ -z "$version" ]; then
+            echo "@ontrove/extend not among the published packages; nothing to redeploy."
+          elif [ -z "$GH_TOKEN" ]; then
+            echo "::notice::TROVE_REPOS_TOKEN is not set; redeploy the toolkits for @ontrove/extend $version by hand."
+          else
+            gh api repos/hollyburnanalytics/trove/dispatches \
+              -f event_type=extend-published \
+              -f "client_payload[version]=$version"
+            echo "Asked trove to redeploy every toolkit on @ontrove/extend $version."
+          fi

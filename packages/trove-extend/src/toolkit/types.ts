@@ -13,6 +13,7 @@
 import type { z } from 'zod';
 import type { ExtensionContext, ManifestConfigField } from '../types.js';
 import type { ToolError } from './errors.js';
+import type { FilesClient } from './files.js';
 
 /**
  * Parameters to {@link TroveClient.search}.
@@ -248,6 +249,12 @@ export interface ToolContext extends ExtensionContext {
    * platform already refreshed on the way in.
    */
   readonly requireAccessToken?: () => Promise<string>;
+  /**
+   * Files the caller staged in Trove, read by id — present only if the
+   * manifest `scopes` include `trove:files`. The way a tool takes a file too
+   * large to pass inline: the caller uploads it out of band and passes the id.
+   */
+  readonly files?: FilesClient;
   /**
    * A scoped client over the caller's own knowledge base — present only if
    * the manifest `scopes` requested `trove:search` and/or `trove:ingest`.

@@ -38,6 +38,7 @@ export { z } from 'zod';
 export type { FetchLike } from './ctx.js';
 export { type DefineOptions, defineToolkit, tool, toToolkitManifest } from './define.js';
 export { ToolError, type ToolErrorOptions } from './errors.js';
+export type { FilesClient, StagedFile } from './files.js';
 export {
   dispatch,
   type FetchHandler,

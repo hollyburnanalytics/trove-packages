@@ -415,6 +415,7 @@ export function defineToolkit(
       ctxToken: call.ctxToken,
       callbackBase: call.callbackBase,
       troveEnabled: (call.scopes ?? []).some((s) => s === 'trove:search' || s === 'trove:ingest'),
+      filesEnabled: (call.scopes ?? []).includes('trove:files'),
       fetchImpl,
       logSink: (args: unknown[]): void => {
         logBuffer.push(args);

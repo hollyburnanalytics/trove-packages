@@ -7,6 +7,7 @@
  *
  * - `ctx.secret(name)` → `POST {callbackBase}/internal/secret { ctxToken, name }`
  * - `ctx.trove.*`      → `POST {callbackBase}/internal/trove  { ctxToken, operation, variables }`
+ * - `ctx.files.read`   → `POST {callbackBase}/internal/file   { ctxToken, fileId }` (raw bytes back)
  * - `ctx.fetch(...)`   → egress through a proxy that blocks requests to
  *   private/loopback/link-local addresses (host allowlist enforced upstream)
  * - `ctx.log(...)`     → buffered structured log lines (redacted upstream)
@@ -22,6 +23,7 @@ import {
   makeRequireAccessToken,
   makeRequireSecret,
 } from './auth.js';
+import { type FilesClient, makeFilesClient } from './files.js';
 import { redactSecrets } from './redact.js';
 import type {
   OAuth2ClientCredentials,
@@ -55,6 +57,8 @@ export interface CtxParams {
   callbackBase: string;
   /** Whether `ctx.trove` should be present (manifest granted a `trove:*` scope). */
   troveEnabled: boolean;
+  /** Whether `ctx.files` should be present (manifest granted `trove:files`). */
+  filesEnabled?: boolean;
   /** The fetch implementation (injectable for tests). */
   fetchImpl: FetchLike;
   /** Sink for `ctx.log(...)` lines. */
@@ -239,6 +243,7 @@ export function buildCtx(p: CtxParams): ToolContext {
     now: ToolContext['now'];
     config: ToolContext['config'];
     trove?: TroveClient;
+    files?: FilesClient;
   } = {
     userId: p.userId,
     // Frozen so a tool cannot mutate its own settings and confuse itself
@@ -258,6 +263,10 @@ export function buildCtx(p: CtxParams): ToolContext {
 
   if (p.troveEnabled) {
     base.trove = makeTroveClient(p);
+  }
+
+  if (p.filesEnabled) {
+    base.files = makeFilesClient(p);
   }
 
   return base;

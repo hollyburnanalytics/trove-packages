@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { FetchLike } from '../../src/toolkit/ctx.js';
 import { defineToolkit } from '../../src/toolkit/define.js';
 import { z } from '../../src/toolkit/index.js';
 import type { ToolCall } from '../../src/toolkit/types.js';
@@ -397,5 +398,149 @@ describe('the context spine a toolkit shares with a source', () => {
 
   it('sees {} when the toolkit declares no settings', async () => {
     expect(await probe((ctx) => ctx.config)).toEqual({});
+  });
+});
+
+describe('ctx.files', () => {
+  /** The bytes of a small binary file — every value 0..255. */
+  const BYTES = Uint8Array.from({ length: 256 }, (_, i) => i);
+
+  async function sha256Hex(bytes: Uint8Array): Promise<string> {
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes as BufferSource));
+    return Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  function fileResponse(bytes: Uint8Array, headers: Record<string, string> = {}): Response {
+    return new Response(bytes as BodyInit, {
+      status: 200,
+      headers: { 'content-type': 'image/png', ...headers },
+    });
+  }
+
+  function serverReading(fetchImpl: FetchLike) {
+    const seen: { files?: unknown; result?: unknown } = {};
+    const server = defineToolkit(
+      {
+        ...TOOLKIT_META,
+        tools: [
+          {
+            name: 't',
+            description: 'd',
+            input: z.object({ id: z.string() }),
+            handler: async ({ id }, ctx) => {
+              seen.files = ctx.files;
+              if (!ctx.files) return 'no files';
+              const file = await ctx.files.read(id);
+              seen.result = file;
+              return `${file.name} ${file.size}`;
+            },
+          },
+        ],
+      },
+      { fetchImpl },
+    );
+    return { server, seen };
+  }
+
+  it('is absent unless the manifest declared trove:files', async () => {
+    const fetchImpl = vi.fn();
+    const { server, seen } = serverReading(fetchImpl);
+    const r = await server.handle(
+      baseCall({ tool: 't', args: { id: 'stg_x' }, scopes: ['trove:search'] }),
+    );
+    expect(r).toEqual({ ok: true, result: { text: 'no files' } });
+    expect(seen.files).toBeUndefined();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('POSTs to /internal/file and returns the bytes with their name and hash', async () => {
+    const sha = await sha256Hex(BYTES);
+    const fetchImpl = vi.fn(async () =>
+      fileResponse(BYTES, {
+        'x-trove-sha256': sha,
+        'x-trove-file-name': encodeURIComponent('reçu 7.png'),
+      }),
+    );
+    const { server, seen } = serverReading(fetchImpl);
+    const r = await server.handle(
+      baseCall({ tool: 't', args: { id: ' stg_abc ' }, scopes: ['trove:files'] }),
+    );
+    expect(r).toEqual({ ok: true, result: { text: 'reçu 7.png 256' } });
+    expect(seen.result).toEqual({
+      id: 'stg_abc',
+      name: 'reçu 7.png',
+      contentType: 'image/png',
+      size: 256,
+      sha256: sha,
+      bytes: BYTES,
+    });
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://cp.example/internal/file');
+    expect(JSON.parse(init.body as string)).toEqual({ ctxToken: 'tok-123', fileId: 'stg_abc' });
+  });
+
+  it('refuses bytes that do not match the hash taken at upload, as retryable', async () => {
+    const fetchImpl = vi.fn(async () => fileResponse(BYTES, { 'x-trove-sha256': 'f'.repeat(64) }));
+    const { server } = serverReading(fetchImpl);
+    const r = await server.handle(
+      baseCall({ tool: 't', args: { id: 'stg_abc' }, scopes: ['trove:files'] }),
+    );
+    expect(r).toMatchObject({ ok: false, retryable: true });
+    expect((r as { error: string }).error).toContain('arrived damaged');
+  });
+
+  it('passes the platform’s not-found sentence through, as not retryable', async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({ error: 'No staged file stg_abc: it expired. Stage it again.' }, 404),
+    );
+    const { server } = serverReading(fetchImpl);
+    const r = await server.handle(
+      baseCall({ tool: 't', args: { id: 'stg_abc' }, scopes: ['trove:files'] }),
+    );
+    expect(r).toMatchObject({
+      ok: false,
+      retryable: false,
+      error: 'No staged file stg_abc: it expired. Stage it again.',
+    });
+  });
+
+  it('writes its own not-found sentence when the platform sent none', async () => {
+    const fetchImpl = vi.fn(async () => new Response('gone', { status: 404 }));
+    const { server } = serverReading(fetchImpl);
+    const r = await server.handle(
+      baseCall({ tool: 't', args: { id: 'stg_abc' }, scopes: ['trove:files'] }),
+    );
+    expect((r as { error: string }).error).toContain('never uploaded, or it expired');
+  });
+
+  it('refuses an empty id without calling out', async () => {
+    const fetchImpl = vi.fn();
+    const { server } = serverReading(fetchImpl);
+    const r = await server.handle(
+      baseCall({ tool: 't', args: { id: '  ' }, scopes: ['trove:files'] }),
+    );
+    expect(r).toMatchObject({ ok: false, error: 'A file id is required.' });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('treats any other callback failure as an unexpected error, not a tool answer', async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({ error: 'scope trove:files not granted' }, 403),
+    );
+    const { server } = serverReading(fetchImpl);
+    const r = await server.handle(
+      baseCall({ tool: 't', args: { id: 'stg_abc' }, scopes: ['trove:files'] }),
+    );
+    // An uncaught Error: the SDK masks its text from the model, as for any bug.
+    expect(r).toMatchObject({ ok: false, error: 'tool failed' });
+  });
+
+  it('tolerates a missing hash header and a malformed name', async () => {
+    const fetchImpl = vi.fn(async () =>
+      fileResponse(BYTES, { 'x-trove-file-name': '%E0%A4%A', 'content-type': '' }),
+    );
+    const { server, seen } = serverReading(fetchImpl);
+    await server.handle(baseCall({ tool: 't', args: { id: 'stg_abc' }, scopes: ['trove:files'] }));
+    expect(seen.result).toMatchObject({ name: '%E0%A4%A', size: 256 });
   });
 });

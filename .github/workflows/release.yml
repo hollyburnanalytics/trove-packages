@@ -11,18 +11,19 @@ permissions:
   pull-requests: write
   # Needed to dispatch the Binaries workflow after a publish (gh workflow run).
   actions: write
-  # Mint an OIDC token so npm attaches a provenance attestation to each publish.
-  # (The repo is public and every package declares `repository`, which provenance
-  # requires.) Publishing still authenticates with the automation NPM_TOKEN below;
-  # migrating to full OIDC trusted publishing — which would retire the token — is
-  # tracked separately (blocked on a scoped-package + changesets/action bug).
+  # npm trusted publishing: the publish authenticates with a short-lived OIDC
+  # token GitHub mints for this workflow, so there is no long-lived npm token to
+  # expire or leak. Each package names this repo, `release.yml` and the
+  # `npm-publish` environment as its trusted publisher on npmjs.com; a publish
+  # from anywhere else is refused. npm also attaches a provenance attestation.
   id-token: write
 
 jobs:
   release:
     runs-on: ubuntu-latest
-    # Gate access to NPM_TOKEN behind a protected Environment (configure required
-    # reviewers + restrict to `main` in repo settings → Environments → npm-publish).
+    # The trusted-publisher entry on npmjs.com names this environment, so a
+    # publish has to run inside it. Restrict it to `main` in repo settings →
+    # Environments → npm-publish.
     environment: npm-publish
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -33,25 +34,23 @@ jobs:
       - name: Verify
         run: bun run check
 
-      # Explicit npm auth so `changeset publish` is authenticated regardless of the
-      # toolchain (we use mise, not setup-node's registry-url). The token is read
-      # from the environment at publish time; nothing secret is written to the repo.
-      - name: Configure npm auth
-        run: echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" > "$HOME/.npmrc"
+      # Trusted publishing needs npm 11.5.1 or later; Node 22 ships npm 10.
+      # `changeset publish` shells out to this npm.
+      - name: npm with trusted publishing
+        run: npm install -g npm@^11.5.1 && npm --version
 
+      # v2 of the action writes no `.npmrc`. v1 always appended an
+      # `_authToken=${NPM_TOKEN}` line, which overrode OIDC, and that is what
+      # kept this workflow on a long-lived token until now.
       - name: Create release PR or publish to npm
         id: changesets
-        uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1
+        uses: changesets/action@66d7d1ddafddf1ef45f98ee51a7496f9cdadb2f4 # v2.1.2
         with:
-          publish: bun run release
-          version: bun run version
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          # Publish with a provenance attestation (needs the id-token permission
-          # above). npm records the source repo, commit, and workflow that built
-          # the tarball, so consumers can verify it came from this repo.
-          NPM_CONFIG_PROVENANCE: "true"
+          publish-script: bun run release
+          version-script: bun run version
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # v1 pushed with the git CLI; keep that so release tags behave as before.
+          push-with-git-cli: true
 
       # When the CLI was just published, kick off the standalone-binary build for
       # its release tag. This must be a `workflow_dispatch` (not a tag-`push`
@@ -62,7 +61,7 @@ jobs:
         if: steps.changesets.outputs.published == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PUBLISHED: ${{ steps.changesets.outputs.publishedPackages }}
+          PUBLISHED: ${{ steps.changesets.outputs.published-packages }}
         run: |
           set -euo pipefail
           tag=$(printf '%s' "$PUBLISHED" \
@@ -84,7 +83,7 @@ jobs:
         if: steps.changesets.outputs.published == 'true'
         env:
           GH_TOKEN: ${{ secrets.TROVE_REPOS_TOKEN }}
-          PUBLISHED: ${{ steps.changesets.outputs.publishedPackages }}
+          PUBLISHED: ${{ steps.changesets.outputs.published-packages }}
         run: |
           set -euo pipefail
           version=$(printf '%s' "$PUBLISHED" \

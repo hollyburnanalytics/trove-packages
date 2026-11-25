@@ -36,7 +36,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.8",
-    "@changesets/cli": "^2.27.9",
+    "@changesets/cli": "^3.0.3",
     "knip": "^6.25.0",
     "lefthook": "^2.1.10",
     "typedoc": "^0.28.0",
